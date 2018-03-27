@@ -905,4 +905,51 @@ var rootjQuery,
       throw ex;
     }
 
+    function adoptValue( value, resolve, reject, noValue ) {
+
+    }
+
+    jQuery.extend( {
+      Deffered: function( func ) {
+
+        var tuples = [
+          [ "notify", "progress", jQuery.Callbacks( "memory" ),
+            jQuery.Callbacks( "memory" ), 2 ],
+          [ "resolve", "done", jQuery.Callbacks( "once memory" ),
+            jQuery.Callbacks( "once memory" ), 0, "resolved" ],
+          [ "reject", "fail", jQuery.Callbacks( "once memory" ),
+            jQuery.Callbacks( "once memory" ), 1, "rejected" ]
+        ],
+
+          state = "pending",
+
+          promise = {
+
+            state: function() {
+              return state;
+            },
+            always: function() {
+
+            },
+            "catch": function() {
+
+            },
+            pipe: function() {
+
+            },
+            then: function() {
+
+            },
+            promise: function() {
+              
+            }
+          },
+          deffered = {
+
+          };
+          jQuery.each( tuples, function() {} );
+      },
+      when: function() {}
+    } );
+
 module.exports = jQuery

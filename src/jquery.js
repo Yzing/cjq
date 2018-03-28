@@ -957,8 +957,8 @@ var rootjQuery,
 
                 // deferred.progress(function() { bind to newDefer or newDefer.notify })
                 // 在原来的 deferred 中注册函数
-  							// deferred.done(function() { bind to newDefer or newDefer.resolve })
-  							// deferred.fail(function() { bind to newDefer or newDefer.reject })
+          			// deferred.done(function() { bind to newDefer or newDefer.resolve })
+          			// deferred.fail(function() { bind to newDefer or newDefer.reject })
                 deferred[ tuple[ 1 ] ]( function() {
                   // 调用 fn
                   // arguments 为 deferred 状态转移函数的传参，
@@ -991,29 +991,39 @@ var rootjQuery,
 
             var maxDepth = 0;
 
+            // handler 即为回调
             function resolve( depth, deferred, handler, special ) {
+              // 返回的 function 会注入调用该 then 方法的 deferred 的回调列表中
               return function() {
-                var that = this,
+                var that = this, // 将函数调用者的作用域赋予 that 变量
                   args = arguments,
+
+                  // 解析主体逻辑函数
                   mightThrow = function() {
 
                     var returned, then;
 
+                    // 比如当 handler 是 onFulfilled回调 且 返回一个 deferred 后，maxDepth 自增，会一直等待该 deferred 的状态改变
+                    // 任何再次的状态转移函数的调用不会再次执行
                     if ( depth < maxDepth ) {
                       return;
                     }
 
                     returned = handler.apply( that, args );
 
+                    // 参照 Promise|A+ 规范，返回结果如果是参数中 deferred 的 promise 引用，则抛出异常
+                    // 也就是说，handler 不可以是 deferred 的 promise 方法
                     if ( returned === deferred.promise() ) {
                       throw new TypeError( "Thenable self-resolution" );
                     }
 
+                    // then 赋值
                     then = returned &&
   										( typeof returned === "object" ||
   											typeof returned === "function" ) &&
   										returned.then;
 
+                    // 如果 returned 是一个 deferred 对象或其他 promise 标准的实现，会调用其 then 方法注入回调
                     if ( isFunction( then ) ) {
                       if ( special ) {
                         then.call(
@@ -1023,6 +1033,7 @@ var rootjQuery,
                         );
                       } else {
 
+                        // 正常情况下，深度加一，为 returned 注入回调
                         maxDepth++;
 
                         then.call(
@@ -1034,11 +1045,14 @@ var rootjQuery,
                         );
                       }
                     } else {
-                      if ( handle !== Indentity ) {
+                      // 否则，returned 就是要返回的 value 值
+                      if ( handler !== Indentity ) {
                         that = undefined;
                         args = [ returned ];
                       }
-
+                      // 如果指定了状态转移方法，就调用指定的方法
+                      // 没有指定的话，就 resolve
+                      // returned 作为 resolveWith 的入参
                       ( special || deferred.resolveWith )( that, args )
                     }
                   },
@@ -1048,10 +1062,12 @@ var rootjQuery,
                       try {
                         mightThrow()
                       } catch ( e ) {
+                        // 捕获 mightThrow 中的异常
                         if ( jQuery.Deferred.exceptionHook ) {
                           jQuery.Deferred.exceptionHook( e,
   													process.stackTrace );
                         }
+                        // 说明 deferred 嵌套到了最后一层，直接 reject 异常
                         if ( depth + 1 >= maxDepth ) {
 
   												// Only substitute handlers pass on context
@@ -1060,16 +1076,16 @@ var rootjQuery,
   													that = undefined;
   													args = [ e ];
   												}
-
   												deferred.rejectWith( that, args );
   											}
                       }
                     };
 
+                // 如果 depth 大于 0，则直接执行 process
                 if ( depth ) {
                   process();
                 } else {
-
+                  // 否则设置异步执行
   								// Call an optional hook to record the stack, in case of exception
   								// since it's otherwise lost when execution goes async
   								if ( jQuery.Deferred.getStackHook ) {
@@ -1080,7 +1096,13 @@ var rootjQuery,
               };
             }
 
-            return jQuery.Deffered( function( newDefer) {
+            // 返回一个新的 deferred 实例的 promise 对象，使其可链式调用
+            // 并且在老的 deferred 实例的 回调列表中注入 resolve 函数
+            // 老的 deferred 实例的状态改变会调用注入的 resolve 函数，使其去改变新的 deferred 的状态
+            // 回调的返回值可能是一个 [deferred]，则将新 deferred 的 resolve 权交给返回值的 deferred
+            // 返回的 promise 和调用 then 的 promise 不会指向同一个对象
+            // 和 jQuery 的链式调用比较，jQuery 返回的对象如果调用 pushStack 返回，就不是原对象引用，如果是 this 返回，是原对象引用
+            return jQuery.Deffered( function( newDefer ) {
 
               tuples[ 0 ][ 3 ].add(
                 resolve(
@@ -1122,8 +1144,14 @@ var rootjQuery,
         jQuery.each( tuples, function( i, tuple ) {
           var list = tuple[ 2 ],
             stateString = tuple[ 5 ];
+
+          // promise.progress()
+          // promise.fail()
+          // promise.done()
+          // 和 then 用的不是同一个回调列表
           promise[ tuple[ 1 ] ] = list.add;
 
+          // 如果状态改变了，就作废另外一个状态的回调列表，并锁住 progress 的回调列表
           if ( stateString ) {
             list.add(
     					function() {
@@ -1149,6 +1177,7 @@ var rootjQuery,
     				);
           }
 
+          // 同时触发 then 方法注册的回调
           list.add( tuple[ 3 ].fire );
 
           deferred[ tuple[ 0 ] ] = function() {

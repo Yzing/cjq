@@ -1,34 +1,14 @@
 const $ = require("../dist/jquery-3.3.1");
 
-let defer = $.Deferred();
+let d1 = $.Deferred();
+let d2 = $.Deferred();
+let d3 = $.Deferred();
 
-let promise = defer.promise();
-console.log( promise )
-
-let defer2 = $.Deferred();
-
-let defer3 = $.Deferred();
-
-let newPromise = promise.then(
-  function( args ) {
-    console.log( this )
-    console.log( args )
-    return defer2;
-  },
-  function( e ) {
-    console.log( 'rejected', e )
-  },
+$.when( d1, d2, d3 ).done(
   function() {
-    console.log( 'progress' )
-  }
-)
-
-newPromise.done(
-  function( arg ) {
     console.log( this )
-    console.log( 'new Promise done' )
   }
 )
-
-defer2.resolve( )
-defer.resolve( '111' )
+d1.resolveWith( window );
+d2.resolveWith( window );
+d3.resolveWith( window );

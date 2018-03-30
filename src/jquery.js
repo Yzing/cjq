@@ -907,6 +907,21 @@ var rootjQuery,
 
     function adoptValue( value, resolve, reject, noValue ) {
 
+      var method;
+
+      try{
+        if ( value && isFunction( ( method = value.promise ) ) ) {
+          method.call( value ).done( resolve ).fail( reject );
+        }
+        else if ( value && isFunction( ( method = value.then ) ) ) {
+          method.call( value, resolve, reject );
+        } else {
+          resolve.apply( undefined, [ value ].slice( noValue ) );
+        }
+      } catch ( value ) {
+        reject.apply( undefined, [ value ] );
+      }
+
     }
 
     jQuery.extend( {
@@ -991,11 +1006,13 @@ var rootjQuery,
 
             var maxDepth = 0;
 
-            // handler 即为回调
             function resolve( depth, deferred, handler, special ) {
+
               // 返回的 function 会注入调用该 then 方法的 deferred 的回调列表中
               return function() {
-                var that = this, // 将函数调用者的作用域赋予 that 变量
+
+                // 继承状态转移方法传入的作用域
+                var that = this,
                   args = arguments,
 
                   // 解析主体逻辑函数
@@ -1003,28 +1020,31 @@ var rootjQuery,
 
                     var returned, then;
 
-                    // 比如当 handler 是 onFulfilled回调 且 返回一个 deferred 后，maxDepth 自增，会一直等待该 deferred 的状态改变
-                    // 任何再次的状态转移函数的调用不会再次执行
+                    // 多层嵌套异步操作时，如果当前深度小于最大深度，说明当前深度的异步操作已经被解析过了
+                    // 目前状态是等待 maxDepth 深度的异步操作进行解析，所以直接返回不做任何操作
                     if ( depth < maxDepth ) {
                       return;
                     }
 
+                    // 调用 handler
                     returned = handler.apply( that, args );
 
                     // 参照 Promise|A+ 规范，返回结果如果是参数中 deferred 的 promise 引用，则抛出异常
-                    // 也就是说，handler 不可以是 deferred 的 promise 方法
+                    // 否则会将自身的状态转移方法注入自己的回调队列中，如果是 notify 调用，会造成方法调用死循环
                     if ( returned === deferred.promise() ) {
                       throw new TypeError( "Thenable self-resolution" );
                     }
 
                     // then 赋值
                     then = returned &&
-  										( typeof returned === "object" ||
-  											typeof returned === "function" ) &&
-  										returned.then;
+            					( typeof returned === "object" ||
+            						typeof returned === "function" ) &&
+            					returned.then;
 
                     // 如果 returned 是一个 deferred 对象或其他 promise 标准的实现，会调用其 then 方法注入回调
                     if ( isFunction( then ) ) {
+
+                      // special 是 notify 状态转移函数，这时不会增加异步深度，因为该异步对象根本没有被解析
                       if ( special ) {
                         then.call(
                           returned,
@@ -1033,7 +1053,8 @@ var rootjQuery,
                         );
                       } else {
 
-                        // 正常情况下，深度加一，为 returned 注入回调
+                        // 如果没有 special，说明异步对象已经被解析了，而且 returned 也是一个异步对象
+                        // 说明有异步对象嵌套，于是深度 +1
                         maxDepth++;
 
                         then.call(
@@ -1041,43 +1062,57 @@ var rootjQuery,
                           resolve( maxDepth, deferred, Indentity, special ),
                           resolve( maxDepth, deferred, Thrower, special ),
                           resolve( maxDepth, deferred, Identity,
-  													deferred.notifyWith )
+            								deferred.notifyWith )
                         );
                       }
                     } else {
+
                       // 否则，returned 就是要返回的 value 值
                       if ( handler !== Indentity ) {
+
+                        // 此时 handler 就是自定义的回调，原来 deferred 解析的作用域不会影响新返回的 deferred
+                        // 原来的 deferred 即为调用 then 方法的 deferred
+                        // 新的 deferred 即为 resolve 方法传入的参数 deferred
                         that = undefined;
+
+                        // 如果 handler 为自定义回调，解析的参数取决于其返回值
+                        // 否则就取决于状态转移方法调用时的入参
                         args = [ returned ];
                       }
-                      // 如果指定了状态转移方法，就调用指定的方法
-                      // 没有指定的话，就 resolve
-                      // returned 作为 resolveWith 的入参
+
+                      // handler 执行时未抛出异常，只能是 resolve 或 notify 调用
+                      // special 即为 notify 调用函数
                       ( special || deferred.resolveWith )( that, args )
                     }
                   },
+
+                  // 如果有 special，则是 notify 调用，异步对象并没有被解析，不会抛出异常，直接用 mightThrow 即可
+                  // 否则需要捕获异常
                   process = special ?
                     mightThrow :
                     function() {
                       try {
                         mightThrow()
                       } catch ( e ) {
-                        // 捕获 mightThrow 中的异常
+
+                        // 在控制台中显示异常信息
                         if ( jQuery.Deferred.exceptionHook ) {
                           jQuery.Deferred.exceptionHook( e,
-  													process.stackTrace );
+            								process.stackTrace );
                         }
-                        // 说明 deferred 嵌套到了最后一层，直接 reject 异常
+
+                        // 在已经解析过的深度发生的任何异常都忽略掉
                         if ( depth + 1 >= maxDepth ) {
 
-  												// Only substitute handlers pass on context
-  												// and multiple values (non-spec behavior)
-  												if ( handler !== Thrower ) {
-  													that = undefined;
-  													args = [ e ];
-  												}
-  												deferred.rejectWith( that, args );
-  											}
+            							if ( handler !== Thrower ) {
+            								that = undefined;
+            								args = [ e ];
+            							}
+
+                          // 说明该异步对象已经被完全解析，此时捕获的异常就是 reject 的参数
+                          // 当前解析的深度 >= maxDepth
+            							deferred.rejectWith( that, args );
+            						}
                       }
                     };
 
@@ -1085,14 +1120,14 @@ var rootjQuery,
                 if ( depth ) {
                   process();
                 } else {
+
+            			if ( jQuery.Deferred.getStackHook ) {
+            				process.stackTrace = jQuery.Deferred.getStackHook();
+            			}
+
                   // 否则设置异步执行
-  								// Call an optional hook to record the stack, in case of exception
-  								// since it's otherwise lost when execution goes async
-  								if ( jQuery.Deferred.getStackHook ) {
-  									process.stackTrace = jQuery.Deferred.getStackHook();
-  								}
-  								window.setTimeout( process );
-  							}
+            			window.setTimeout( process );
+            		}
               };
             }
 
@@ -1141,65 +1176,111 @@ var rootjQuery,
           }
         },
         deferred = {};
-        jQuery.each( tuples, function( i, tuple ) {
-          var list = tuple[ 2 ],
-            stateString = tuple[ 5 ];
+      jQuery.each( tuples, function( i, tuple ) {
+        var list = tuple[ 2 ],
+          stateString = tuple[ 5 ];
 
-          // promise.progress()
-          // promise.fail()
-          // promise.done()
-          // 和 then 用的不是同一个回调列表
-          promise[ tuple[ 1 ] ] = list.add;
+        // promise.progress()
+        // promise.fail()
+        // promise.done()
+        // 和 then 用的不是同一个回调列表
+        promise[ tuple[ 1 ] ] = list.add;
 
-          // 如果状态改变了，就作废另外一个状态的回调列表，并锁住 progress 的回调列表
-          if ( stateString ) {
-            list.add(
-    					function() {
+        // 如果状态改变了，就作废另外一个状态的回调列表，并锁住 progress 的回调列表
+        if ( stateString ) {
+          list.add(
+      			function() {
 
-    						// state = "resolved" (i.e., fulfilled)
-    						// state = "rejected"
-    						state = stateString;
-    					},
+      				// state = "resolved" (i.e., fulfilled)
+      				// state = "rejected"
+      				state = stateString;
+      			},
 
-    					// rejected_callbacks.disable
-    					// fulfilled_callbacks.disable
-    					tuples[ 3 - i ][ 2 ].disable,
+      			// rejected_callbacks.disable
+      			// fulfilled_callbacks.disable
+      			tuples[ 3 - i ][ 2 ].disable,
 
-    					// rejected_handlers.disable
-    					// fulfilled_handlers.disable
-    					tuples[ 3 - i ][ 3 ].disable,
+      			// rejected_handlers.disable
+      			// fulfilled_handlers.disable
+      			tuples[ 3 - i ][ 3 ].disable,
 
-    					// progress_callbacks.lock
-    					tuples[ 0 ][ 2 ].lock,
+      			// progress_callbacks.lock
+      			tuples[ 0 ][ 2 ].lock,
 
-    					// progress_handlers.lock
-    					tuples[ 0 ][ 3 ].lock
-    				);
-          }
-
-          // 同时触发 then 方法注册的回调
-          list.add( tuple[ 3 ].fire );
-
-          deferred[ tuple[ 0 ] ] = function() {
-    				deferred[ tuple[ 0 ] + "With" ]( this === deferred ? undefined : this, arguments );
-    				return this;
-    			};
-
-    			// deferred.notifyWith = list.fireWith
-    			// deferred.resolveWith = list.fireWith
-    			// deferred.rejectWith = list.fireWith
-    			deferred[ tuple[ 0 ] + "With" ] = list.fireWith;
-
-        } );
-
-        promise.promise( deferred );
-
-        if ( func ) {
-          func.call( deferred, deferred );
+      			// progress_handlers.lock
+      			tuples[ 0 ][ 3 ].lock
+      		);
         }
-        return deferred;
+
+        // 同时触发 then 方法注册的回调
+        list.add( tuple[ 3 ].fire );
+
+        deferred[ tuple[ 0 ] ] = function() {
+      		deferred[ tuple[ 0 ] + "With" ]( this === deferred ? undefined : this, arguments );
+      		return this;
+      	};
+
+      	// deferred.notifyWith = list.fireWith
+      	// deferred.resolveWith = list.fireWith
+      	// deferred.rejectWith = list.fireWith
+      	deferred[ tuple[ 0 ] + "With" ] = list.fireWith;
+
+      } );
+
+      promise.promise( deferred );
+
+      if ( func ) {
+        func.call( deferred, deferred );
+      }
+      return deferred;
     },
-    when: function() {}
+    // when 的参数可以是一个或多个同步或异步对象
+    // 如果是同步对象，then 注册的回调会立即执行
+    // 如果是异步对象，则需要所有的异步对象都解析后 then 中回调再执行
+    // then 中 onFullFilled 只有在所有异步对象都 resolve 后才执行
+    when: function( singleValue ) {
+      var remaining = arguments.length,
+        i = remaining,
+        resolveContexts = Array( i ),
+        resolveValues = slice.call( arguments ),
+        master = jQuery.Deferred(),
+
+        updateFunc = function( i ) {
+          return function( value ) {
+            resolveContexts[ i ] = this;
+  					resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
+  					if ( !( --remaining ) ) {
+  						master.resolveWith( resolveContexts, resolveValues );
+  					}
+          }
+        };
+
+      // 处理参数为单个和没有参数的情况
+      if ( remaining <= 1 ) {
+
+        // 将 updateFunc 注入 master 的回调中
+        // 如果 singleValue 是异步对象，就把 master 的解析交给 singleValue
+        // 如果 singleValue 是非异步对象，就立即解析 master
+        // 执行过程中的任何异常都会导致 master.reject 执行
+        // remaining 用于表示是否还有剩余的未解析对象
+        // master 会被解析两次？？
+        adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject, !remaining );
+
+        // 如果 singleValue 是一个异步对象，就返回 master 的 promise
+        // 即当 when 返回的对象注册的回调会在 singleValue 解析后执行
+        if ( master.state() === "pending" || isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
+          return master.then();
+        }
+
+        // 否则 master 的状态已经变成 fulfilled 或 rejected，此时 i = [ 0 || 1 ]
+      }
+
+      while ( i-- ) {
+        adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+      }
+
+      return master.promise();
+    }
   } );
 
 module.exports = jQuery

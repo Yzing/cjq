@@ -1263,18 +1263,18 @@ var rootjQuery,
         // 如果 singleValue 是非异步对象，就立即解析 master
         // 执行过程中的任何异常都会导致 master.reject 执行
         // remaining 用于表示是否还有剩余的未解析对象
-        // master 会被解析两次？？
         adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject, !remaining );
 
         // 如果 singleValue 是一个异步对象，就返回 master 的 promise
         // 即当 when 返回的对象注册的回调会在 singleValue 解析后执行
         if ( master.state() === "pending" || isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
+
           return master.then();
         }
 
-        // 否则 master 的状态已经变成 fulfilled 或 rejected，此时 i = [ 0 || 1 ]
       }
 
+      // 解决数组错位
       while ( i-- ) {
         adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
       }
@@ -1282,5 +1282,51 @@ var rootjQuery,
       return master.promise();
     }
   } );
+
+var rerrorNames = /^(Eval|Internal|Range|Reference|Syntax|Type|URI)Error$/;
+
+jQuery.Deferred.exceptionHook = function( error, stack ) {
+
+	// Support: IE 8 - 9 only
+	// Console exists when dev tools are open, which can happen at any time
+	if ( window.console && window.console.warn && error && rerrorNames.test( error.name ) ) {
+		window.console.warn( "jQuery.Deferred exception: " + error.message, error.stack, stack );
+	}
+};
+
+jQuery.readyException = function( error ) {
+	window.setTimeout( function() {
+		throw error;
+	} );
+};
+
+
+var readyList = jQuery.Deferred();
+
+jQuery.fn.ready = function( fn ) {
+  readyList.then(
+    fn
+  ).catch( function( error ) {
+    jQuery.readyException( error );
+  } );
+  return this;
+};
+
+jQuery.extend( {
+  isReady: false,
+  readyWait: 1,
+  ready: function( wait ) {
+    if ( wait === true ? --jQuery.readyWait : jQuery.isReady ) {
+      return;
+    }
+    jQuery.isReady = true;
+    if ( wait !== true && --jQuery.readyWait > 0 ) {
+      return;
+    }
+    readyList.resolveWith( document, [ jQuery ] );
+  }
+} );
+
+jQuery.ready.then = readyList.then;
 
 module.exports = jQuery

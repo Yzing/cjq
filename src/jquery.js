@@ -1371,8 +1371,372 @@ if ( document.readyState === 'complete' ||
 // jQuery.Data
 
 // 用于对集合的值进行 get 和 set，用于设置 dom 的属性值等
+// 作为 jQuery 内的辅助函数被调用
 var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
+  var i = 0,
+    len = elems.length,
+    bulk = key == null;
 
+  // 先判断是否是 set 操作
+  // set 操作可链式调用，chainable = true
+  if ( toType( key ) === 'object' ) {
+    // 多值 set 操作
+    chainable = true;
+    for ( i in key ) {
+      access( elems, fn, i, key[ i ], true, emptyGet, raw );
+    }
+  } else if ( value !== undefined ) {
+
+    // 单值 set 操作
+    // 分多种情况
+    // 1. key == null
+    //  1.1 value 不为 function -处理方法依赖于 fn，且 fn 会被立即调用
+    //  1.2 value 为 function -处理方法依赖于 fn，且 fn 会被重新包装
+    // 2. key != null
+    //  2.1 value 不为 function
+    //  2.2 value 为 function
+    chainable = true;
+
+    // 标记 value 是否是一个平凡值
+    if ( !isFunction( value ) ) {
+      raw = true;
+    }
+
+    // 处理 key == null 的情况
+    if ( bulk ) {
+
+      // 如果未传入 key 且 value 是一个平凡值
+      if ( raw ) {
+        fn.call( elems, value );
+        fn = null;
+      } else {
+        // 否则，修正 fn
+        bulk = fn;
+        fn = function( elem, key, value ) {
+          return bulk.call( jQuery( elem ), value );
+        };
+      }
+    }
+
+    if ( fn ) {
+      // 处理 key != null，或者 key == null 且 value 为 function 的情况
+      // fn 实际是一个与 jQuery 实例耦合的 access 方法
+      // 1. 如果 value 为 function，且 key 不为空，value 的入参为：
+      //  - i 当前节点下标
+      //  - value, 根据 key 从当前节点取出的属性值
+      for ( ; i < len; i++ ) {
+        fn( elems[ i ], key, raw ? value : value.call( elems[ i ], i, fn( elems[ i ], key ) ) );
+      }
+    }
+  }
+
+  // 如果 chainable 为真，此时 set 操作已经完成，返回 elems 即可
+  if ( chainable ) {
+    return elems;
+  }
+
+  // 否则进行 get 操作
+  // 如果 key == null，返回所有数据
+  if ( bulk ) {
+    return fn.call( elems );
+  }
+
+  // 如果 elems 不为空，就从第一个节点取数据，否则返回指定空值
+  return len ? fn( elems[ 0 ], key ) : emptyGet;
+};
+
+// 处理浏览器前缀问题
+var rmsPrefix = /^-ms-/,
+  rdashAlpha = /-([a-z])/g;
+
+function fcamelCase( all, letter ) {
+  return letter.toUpperCase();
 }
+
+function camelCase( string ) {
+  return string.replace( rmsPrefix, "ms-" ).replace( rdashAlpha, fcamelCase );
+}
+
+var acceptData = function( owner ) {
+  // Accepts only:
+	//  - Node
+	//    - Node.ELEMENT_NODE
+	//    - Node.DOCUMENT_NODE
+	//  - Object
+	//    - Any
+  return owner.nodeType === 1 || owner.nodeType = 9 || !( +owner.nodeType );
+}
+
+// 定义 Data 构造器
+function Data() {
+  this.expando = jQuery.expando + Data.uid++;
+}
+
+Data.uid = 1;
+
+Data.prototype = {
+
+  // 获取 owner 的缓存对象，如果没有就创建一个，可接受的 owner 参照 acceptData 函数
+  cache: function( owner ) {
+
+    // 检查该 Data 对象在 owner 上是否已经有缓存
+    // 如果有，就是直接返回 value
+    var value = owner[ this.expando ];
+
+    // 如果没有就创建一个缓存对象并返回
+    if ( !value ) {
+      value = {};
+
+      if ( acceptData( owner) ) {
+
+        // 判断 owner 是节点还是普通对象
+        if ( owner.nodeType ) {
+          owner[ this.expando ] = value;
+        } else {
+          Object.defineProperty( value, this.expando, {
+            value: value,
+            configurable: true
+          } );
+        }
+      }
+    }
+    return value;
+  },
+
+  set: function( owner, data, value ) {
+    var prop,
+      cache = this.cache( owner );
+
+    // 如果 data 是字符串，则是单值 set，就直接放入缓存中
+    if ( typeof data === 'string' ) {
+      cache[ camelCase( data ) ] = value;
+    } else {
+      // 如果 data 是对象，就遍历存入缓存中
+      for ( prop in data ) {
+        cache[ camelCase( prop ) ] = data[ prop ];
+      }
+    }
+    return cache;
+  },
+
+  get: function( owner, key ) {
+    // 如果 key == undefined，就直接返回一个缓存对象
+    // 否则返回 key 对应的 value
+    return key === undefined ?
+      this.cache( owner ) :
+      owner[ this.expando ] && owner[ this.expando ][ camelCase( key ) ];
+  },
+
+  // set get 方法的组合
+  access: function( owner, key, value ) {
+
+    // 判定是 owner 操作
+    if ( key === undefined ||
+        ( ( key && typeof key === 'string' ) && value === undefined ) ) {
+      return this.get( owner, key );
+    }
+
+    // 否则是 set 操作
+    this.set( owner, key, value );
+
+    // 判断单值操作或多值操作返回不同的结果
+    return value !== undefined ? value : key;
+  },
+  remove: function( owner, key ) {
+    var i,
+      cache = owner[ this.expando ];
+    if ( cache === undefined ) {
+      return;
+    }
+    if ( key !== undefined ) {
+      if ( Array.isArray( key ) ) {
+        key = key.map( camelCase );
+      } else {
+        // 格式化 key
+        key = camelCase( key );
+        key = key in cache ? [ key ] : ( key.match( rnothtmlwhite ) || [] );
+      }
+      i = key.length;
+      while( i-- ) {
+        delete cache[ key[ i ] ];
+      }
+    }
+
+    // key 未定义或缓存为空的情况
+    // 直接删除缓存对象
+    if ( key === undefined || jQuery.isEmptyObject( cache ) ) {
+      if ( owner.nodeType ) {
+        owner[ this.expando ] = undefined;
+      } else {
+        delete owner[ this.expando ]
+      }
+    }
+  },
+
+  hasData: function( owner ) {
+    var cache = owner[ this.expando ];
+    return cache !== undefined && !jQuery.isEmptyObject( cache );
+  }
+}
+
+// 私有缓存
+var dataPriv = new Data();
+// 公有缓存
+var dataUser = new Data();
+
+var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/, // 匹配对象或数组
+	rmultiDash = /[A-Z]/g;
+
+// 解析字符串形式的 data
+function getData( data ) {
+
+  if ( data === "true" ) {
+		return true;
+	}
+
+	if ( data === "false" ) {
+		return false;
+	}
+
+	if ( data === "null" ) {
+		return null;
+	}
+
+	if ( data === +data + "" ) {
+		return +data;
+	}
+
+	if ( rbrace.test( data ) ) {
+		return JSON.parse( data );
+	}
+	return data;
+}
+
+// 将 html5 data 属性注入缓存
+function dataAttr( elem, key, data ) {
+  var name;
+
+  if ( data === undefined && elem.nodeType === 1 ) {
+    name = "data-" + key.replace( rmultiDash, "-$&" ).toLowerCase();
+    data = element.getAttribute( name );
+    if ( typeof data === "string" ) {
+      try {
+        data = getData( data );
+      } catch ( e ) {}
+    }
+    // 将 elem 上的私有属性放入缓存中，用 dataUser 来标记
+    dataUser.set( elem, key, data );
+  } else {
+    data = undefined;
+  }
+  return data;
+}
+
+jQuery.extend( {
+  hasData: function( elem ) {
+    return dataUser.hasData( elem ) || dataPriv.hasData( elem );
+  },
+  data: function( elem, name, data ) {
+    return dataUser.access( elem, name, data );
+  },
+  removeData: function( elem, name ) {
+    return dataUser.remove( elem, name );
+  },
+  _data: function( elem, name, data ) {
+    return dataPriv.access( elem, name, data );
+  },
+  _removeData: function( elem, name ) {
+    return dataPriv.remove( elem, name );
+  }
+} );
+
+jQuery.fn.extend( {
+  data: function( key, value ) {
+    var i, name, data,
+      elem = this[ 0 ],
+      attrs = elem && elem.attributes;
+
+    // 如果 key 未定义，就对节点数据进行缓存并返回整个缓存
+    if ( key === undefined ) {
+      if ( this.length ) {
+
+        // 获取自身第一个节点的缓存数据
+        data = dataUser.get( elem );
+
+        // 如果节点类型是元素节点并且没有将 data- 属性存入 dataUser
+        // 就遍历缓存，取出 data- 属性，存入 dataUser
+        if ( elem.nodeType === 1 && !dataPriv.get( elem, "hasDataAttrs") ) {
+          i = attrs.length;
+          while ( i-- ) {
+            if ( attrs[ i ] ) {
+              name = attrs[ i ].name;
+              if ( name.indexOf( "data-" ) === 0 ) {
+                name = camelCase( name.slice( 5 ) );
+                dataAttr( elem, name, data[ name ] );
+              }
+            }
+          }
+          dataPriv.set( "hasDataAttrs", true );
+        }
+      }
+      return data;
+    }
+
+    // 多值属性
+    // 在每一个节点上都设置缓存
+    if ( typeof key === "object" ) {
+      return this.each( function() {
+        dataUser.set( this, key )
+      } );
+    }
+
+    // 处理 key 为单值情况的 get 和 set
+    return access( this, function( value ) {
+
+      var data;
+
+      // 节点存在但 value 未定义，则是 get 操作
+      if ( elem && value === undefined ) {
+
+        // 先从 dataUser 里取
+        data = dataUser.get( elem, key );
+        if ( data !== undefined ) {
+          return data;
+        }
+
+        // 如果 dataUser 没有，就从节点的 data- 属性值里取，并存入 dataUser
+        data = dataAttr( elem, key );
+        if ( data !== undefined ) {
+          return data;
+        }
+
+        // 如果都未取到，则返回空
+        return;
+      }
+
+      // 否则进行 set 操作
+      this.each( function() {
+
+        // 注意，这里 this 指向 jQuery 实例里的每一个元素节点
+        dataUser.set( this, key ,value );
+      } );
+
+    }, null, value, arguments.length > 1, null, true );
+  },
+  removeData( key ) {
+    return this.each( function() {
+      dataUser.remove( this, key );
+    } );
+  }
+} );
+
+jQuery.extend( {
+  queue: function( elem, type, data ) {
+    
+  },
+  dequeue: function() {},
+  _queueHooks: function() {},
+
+} );
 
 module.exports = jQuery

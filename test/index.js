@@ -1,13 +1,6 @@
 const $ = require("../dist/jquery-3.3.1");
 
-let d1 = $.Deferred();
-let d2 = $.Deferred();
-let d3 = $.Deferred();
+$('.a').data( 'test', '123' );
+$('.b').data( 'test', '456' );
 
-$.when( d1 ).done(
-  function() {
-    console.log( this )
-  }
-)
-d1.resolveWith( window );
-d2.resolveWith( window );
+console.log( $('div').data() )

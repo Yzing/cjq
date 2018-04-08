@@ -1730,13 +1730,83 @@ jQuery.fn.extend( {
   }
 } );
 
+
 jQuery.extend( {
+
+  // 在元素上定义回调队列，或数据队列
+  // 采用懒执行，如果没有队列，就新建一个
   queue: function( elem, type, data ) {
-    
+    var queue;
+    if ( elem ) {
+      type = ( type || "fx" ) + "queue";
+      queue = dataPriv.access( elem, type );
+      if ( data ) {
+        if ( !queue || Array.isArray( data ) ) {
+          queue = dataPriv.access( elem, type, jQuery.makeArray( data ) );
+        } else {
+          queue.push( data );
+        }
+      }
+      return queue || [];
+    }
   },
+
+  // 元素上的队列出队
+  dequeue: function( elem, type ) {
+     type = type || "fx";
+     var queue = jQuery.queue( elem, type ),
+      startLength = queue.length,
+      fn = queue.shift(),
+      hooks = jQuery._queueHooks( elem, type ),
+      next = function() {
+        jQuery.dequeue( elem, type );
+      };
+
+      // 只针对 fx queue 进行长度自减
+      if ( fn === "inprogress" ) {
+        fn = queue.shift();
+        startLength--;
+      }
+
+      // fn 出队执行
+      // 如果没有传入 type，就向队首推入 inprogress 状态
+      if ( fn ) {
+        if ( type === "fx" ) {
+          queue.unshift( "inprogress" );
+        }
+
+        delete hooks.stop;
+
+        // fn 执行完成后可以触发下一次的 dequeue
+        // 并且可以触发钩子函数
+        fn.call( elem, next, hooks );
+      }
+
+      // 如果队列清空且有钩子对象，就触发 hooks.empty 钩子
+      // 移除元素上的队列和相应的钩子
+      if ( !startLength && hooks ) {
+        hooks.empty.fire();
+      }
+  },
+
+  _queueHooks: function( elem, type ) {
+    var key = type + "queueHooks";
+    return dataPriv.get( elem, key ) || dataPriv.access( elem, key, {
+      empty: jQuery.Callbacks("once memory").add( function() {
+        dataPriv.remove( elem, [ type + "queue", key ] );
+      } )
+    } );
+  }
+} );
+
+
+
+jQuery.fn.extend( {
+  queue: function() {},
   dequeue: function() {},
   _queueHooks: function() {},
-
+  clearQueue: function() {},
+  promise: function() {}
 } );
 
 module.exports = jQuery

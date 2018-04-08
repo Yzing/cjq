@@ -1731,6 +1731,9 @@ jQuery.fn.extend( {
 } );
 
 
+// -----------------------------------------------------------------------------
+// jQuery 队列
+
 jQuery.extend( {
 
   // 在元素上定义回调队列，或数据队列
@@ -1802,11 +1805,70 @@ jQuery.extend( {
 
 
 jQuery.fn.extend( {
-  queue: function() {},
-  dequeue: function() {},
-  _queueHooks: function() {},
-  clearQueue: function() {},
-  promise: function() {}
+  queue: function( type, data ) {
+    var setter = 2;
+    if ( typeof type !== "string" ) {
+      data = type;
+      type = "fx";
+      setter--;
+    }
+
+    if ( arguments.length < setter ) {
+      return jQuery.queue( this[ 0 ], type );
+    }
+
+    return data === undefined ?
+      this :
+      this.each( function() {
+        var queue = jQuery.queue( this, type, data );
+        jQuery._queueHooks( this, type );
+        if ( type === "fx" && queue[ 0 ] !== "inprogress" ) {
+          jQuery.dequeue( this, type );
+        }
+      } );
+  },
+  dequeue: function( type ) {
+    this.each( function() {
+      jQuery.dequeue( this, type );
+    } );
+  },
+  _queueHooks: function( type ) {
+    this.each( function() {
+      jQuery._queueHooks( this, type );
+    } );
+  },
+  clearQueue: function( type ) {
+    return this.queue( type || "fx", [] );
+  },
+  promise: function( type, obj ) {
+    var tmp,
+      count = 1,
+      defer = jQuery.Deferred(),
+      elements = this,
+      i = this.length,
+      resolve = function() {
+        if ( !(--count) ) {
+          defer.resolveWith( elements, [ elements ] );
+        }
+      };
+
+    if ( typeof type !== "string" ) {
+      obj = type;
+      type = undefined;
+    }
+
+    type = type || "fx";
+
+    while ( i-- ) {
+      tmp = dataPriv.get( elements[ i ], type + "queueHooks" );
+      if ( tmp && tmp.empty ) {
+        count++;
+        tmp.empty.add( resolve );
+      }
+    }
+    resolve();
+    return defer.promise( obj );
+  }
 } );
 
 module.exports = jQuery

@@ -1,3 +1,4 @@
+import './index.css'
 const $ = require("../dist/jquery-3.3.1");
 
 let d1 = $.Deferred();

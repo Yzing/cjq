@@ -17,6 +17,10 @@ const config = {
       {
         test: /\.js$/,
         loader: 'babel-loader'
+      },
+      {
+        test: /\.css/,
+        loader: 'style-loader!css-loader'
       }
     ]
   },
@@ -29,7 +33,8 @@ const config = {
   plugins: [
     new webpack.HotModuleReplacementPlugin(),
     new HtmlWebpackPlugin({
-      template: 'test/index.html'
+      template: 'test/index.html',
+      inject: true
     })
   ]
 }

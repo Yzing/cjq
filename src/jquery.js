@@ -613,674 +613,1262 @@ var rootjQuery,
     return jQuery.makeArray( selector, this );
   };
 
-  init.prototype = jQuery.fn;
+init.prototype = jQuery.fn;
 
-  rootjQuery = jQuery( document );
+rootjQuery = jQuery( document );
 
-  //-------------------- 以上代码基本完成 jQuery 的构造和元素筛查 ^_^ --------------------
-  //-------------------- 之后代码基本是对核心进行扩展，借助了很多上面的核心方法 --------------
+//-------------------- 以上代码基本完成 jQuery 的构造和元素筛查 ^_^ --------------------
+//-------------------- 之后代码基本是对核心进行扩展，借助了很多上面的核心方法 --------------
 
-  var rparentsprev = /^(?:parents|prev(?:Until|All))/,
+var rparentsprev = /^(?:parents|prev(?:Until|All))/,
 
-  	// Methods guaranteed to produce a unique set when starting from a unique set
-  	guaranteedUnique = {
-  		children: true,
-  		contents: true,
-  		next: true,
-  		prev: true
-  	};
+// Methods guaranteed to produce a unique set when starting from a unique set
+guaranteedUnique = {
+	children: true,
+	contents: true,
+	next: true,
+	prev: true
+};
 
-    jQuery.fn.extend( {
-      has: function( target ) {
-        var targets = jQuery( target, this ),
-          len = targets.length;
-        return this.filter( function() {
-          var i = 0;
-          for ( ; i < len; i++ ) {
-            if ( jQuery.contains( this, targets[ i ] ) ) {
-              return true;
-            }
-          }
-        } );
-      },
-      closest: function( selector, context ) {
-        var matched = [],
-          cur,
-          i = 0,
-          l = this.length,
-          targets = typeof selector !== 'string' && jQuery( selector );
-
-          if ( !rneedContext.test( selector ) ) {
-            for ( ; i < l; i++ ) {
-              for ( cur = this[ i ]; cur && cur !== context; cur = cur.parentNode ) {
-                if ( cur.nodeType < 11 && ( targets ?
-                  targets.index( cur ) > -1 :
-                  cur.nodeType === 1 &&
-                  jQuery.find.matchesSelector( selector, cur ) ) ) {
-                    matched.push( cur );
-                    break;
-                }
-              }
-            }
-          }
-
-          return this.pushStack( matched.length > 1 ? jQuery.uniqueSort( matched ) : matched );
-      },
-      index: function( elem ) {
-
-      },
-      add: function( selector, context ) {
-        return this.pushStack( jQuery.uniqueSort(
-          jQuery.merge(
-            this.get(),
-            jQuery( selector, context )
-        ) ) );
-      },
-      addBack: function( selector ) {
-        return this.add( selector == null ?
-          this.prevObject : this.prevObject.filter( selector )
-        );
+jQuery.fn.extend( {
+  has: function( target ) {
+    var targets = jQuery( target, this ),
+      len = targets.length;
+    return this.filter( function() {
+      var i = 0;
+      for ( ; i < len; i++ ) {
+        if ( jQuery.contains( this, targets[ i ] ) ) {
+          return true;
+        }
       }
     } );
+  },
+  closest: function( selector, context ) {
+    var matched = [],
+      cur,
+      i = 0,
+      l = this.length,
+      targets = typeof selector !== 'string' && jQuery( selector );
 
-    function sibling( cur, dir ) {
-      while ( ( cur = cur[ dir ] ) && cur.nodeTyep !== 1 ) {}
-      return cur;
-    }
-
-    // jQuery traversal methods
-    jQuery.each( {
-      parent: function( elem ) {
-        var parent = elem.parentNode;
-        return parent && parent.nodeType !== 11 ? parent : null;
-      },
-      parents: function( elems ) {
-        return dir( elem, 'parentNode' );
-      },
-      parentUntil: function( elems, i, until ) {
-        return dir( elem, 'parentNode', until );
-      },
-      next: function( elem ) {
-        return sibling( elem, 'nextSibling' );
-      },
-      prev: function( elem ) {
-        return sibling( elem, 'previousSibling' );
-      },
-      nextAll: function( elem ) {
-        return dir( elem, 'nextSibling' );
-      },
-      prevAll: function( elem ) {
-        return dir( elem, 'previousSibling' );
-      },
-      nextUntil: function( elem, i, until ) {
-        return dir( elem, 'nextSibling', until );
-      },
-      prevUntil: function( elem, i, until ) {
-        return dir( elem, 'previousSibling', until );
-      },
-      siblings: function( elem ) {
-        return siblings( ( elem.parentNode || {} ).firstChild, elem );
-      },
-      children: function( elem ) {
-        return siblings( elem.firstChild );
-      },
-      contents: function( elem ) {
-        if ( nodeName( elem, 'iframe' ) ) {
-          return elem.contentDocument;
-        }
-
-        if ( nodeName( elem, 'template' ) ) {
-          elem = elem.content || elem;
-        }
-
-        return jQuery.merge( [], elem.childNodes );
-      }
-    }, function( name, fn ) {
-      jQuery.fn[ name ] = function( until, selector ) {
-        var matched = jQuery.map( this, fn, until );
-        if ( name.slice( -5 ) !== 'Until' ) {
-          // first arguments is selector
-          selector = until;
-        }
-
-        if ( selector && typeof selector === 'string' ) {
-          matched = jQuery.filter( selector, matched );
-        }
-
-        if ( this.length > 1 ) {
-
-    			if ( !guaranteedUnique[ name ] ) {
-    				jQuery.uniqueSort( matched );
-    			}
-    			if ( rparentsprev.test( name ) ) {
-    				matched.reverse();
-    			}
-    		}
-
-    		return this.pushStack( matched );
-      };
-    } )
-
-    var rnothtmlwhite = ( /[^\x20\t\r\n\f]+/g );
-
-    function createOptions( options ) {
-      var object = {};
-      jQuery.each( options.match( rnothtmlwhite ) || [], function( _, flag ) {
-        object[ flag ] = true;
-      } )
-      return object;
-    }
-
-    // Deffer implement, include callback list
-    jQuery.Callbacks = function( options ) {
-      options = typeof options === 'string' ?
-        createOptions( options ) :
-        jQuery.extend( {}, options );
-      var
-        firing,
-        memory,
-        fired,
-        locked,
-        list = [],
-        queue = [],
-        firingIndex = -1,
-        fire = function() {
-          locked = locked || options.once;
-          firing = fired = true;
-          for ( ; queue.length; firingIndex = -1 ) {
-            memory = queue.shift();
-            while ( ++firingIndex < list.length ) {
-              if ( list[ firingIndex ].apply( memory[ 0 ], memory[ 1 ] ) === false && options.stopOnFalse ) {
-                firingIndex = list.length;
-                memory = false;
-              }
+      if ( !rneedContext.test( selector ) ) {
+        for ( ; i < l; i++ ) {
+          for ( cur = this[ i ]; cur && cur !== context; cur = cur.parentNode ) {
+            if ( cur.nodeType < 11 && ( targets ?
+              targets.index( cur ) > -1 :
+              cur.nodeType === 1 &&
+              jQuery.find.matchesSelector( selector, cur ) ) ) {
+                matched.push( cur );
+                break;
             }
           }
+        }
+      }
 
-          if ( !options.memory ) {
+      return this.pushStack( matched.length > 1 ? jQuery.uniqueSort( matched ) : matched );
+  },
+  index: function( elem ) {
+
+  },
+  add: function( selector, context ) {
+    return this.pushStack( jQuery.uniqueSort(
+      jQuery.merge(
+        this.get(),
+        jQuery( selector, context )
+    ) ) );
+  },
+  addBack: function( selector ) {
+    return this.add( selector == null ?
+      this.prevObject : this.prevObject.filter( selector )
+    );
+  }
+} );
+
+function sibling( cur, dir ) {
+  while ( ( cur = cur[ dir ] ) && cur.nodeTyep !== 1 ) {}
+  return cur;
+}
+
+// jQuery traversal methods
+jQuery.each( {
+  parent: function( elem ) {
+    var parent = elem.parentNode;
+    return parent && parent.nodeType !== 11 ? parent : null;
+  },
+  parents: function( elems ) {
+    return dir( elem, 'parentNode' );
+  },
+  parentUntil: function( elems, i, until ) {
+    return dir( elem, 'parentNode', until );
+  },
+  next: function( elem ) {
+    return sibling( elem, 'nextSibling' );
+  },
+  prev: function( elem ) {
+    return sibling( elem, 'previousSibling' );
+  },
+  nextAll: function( elem ) {
+    return dir( elem, 'nextSibling' );
+  },
+  prevAll: function( elem ) {
+    return dir( elem, 'previousSibling' );
+  },
+  nextUntil: function( elem, i, until ) {
+    return dir( elem, 'nextSibling', until );
+  },
+  prevUntil: function( elem, i, until ) {
+    return dir( elem, 'previousSibling', until );
+  },
+  siblings: function( elem ) {
+    return siblings( ( elem.parentNode || {} ).firstChild, elem );
+  },
+  children: function( elem ) {
+    return siblings( elem.firstChild );
+  },
+  contents: function( elem ) {
+    if ( nodeName( elem, 'iframe' ) ) {
+      return elem.contentDocument;
+    }
+
+    if ( nodeName( elem, 'template' ) ) {
+      elem = elem.content || elem;
+    }
+
+    return jQuery.merge( [], elem.childNodes );
+  }
+}, function( name, fn ) {
+  jQuery.fn[ name ] = function( until, selector ) {
+    var matched = jQuery.map( this, fn, until );
+    if ( name.slice( -5 ) !== 'Until' ) {
+      // first arguments is selector
+      selector = until;
+    }
+
+    if ( selector && typeof selector === 'string' ) {
+      matched = jQuery.filter( selector, matched );
+    }
+
+    if ( this.length > 1 ) {
+
+			if ( !guaranteedUnique[ name ] ) {
+				jQuery.uniqueSort( matched );
+			}
+			if ( rparentsprev.test( name ) ) {
+				matched.reverse();
+			}
+		}
+
+		return this.pushStack( matched );
+  };
+} )
+
+//------------------------------------------------------------------------------
+// jQuery.Callbacks
+
+var rnothtmlwhite = ( /[^\x20\t\r\n\f]+/g );
+
+function createOptions( options ) {
+  var object = {};
+  jQuery.each( options.match( rnothtmlwhite ) || [], function( _, flag ) {
+    object[ flag ] = true;
+  } )
+  return object;
+}
+
+jQuery.Callbacks = function( options ) {
+  options = typeof options === 'string' ?
+    createOptions( options ) :
+    jQuery.extend( {}, options );
+  var
+    firing,
+    memory,
+    fired,
+    locked,
+    list = [],
+    queue = [],
+    firingIndex = -1,
+    fire = function() {
+      locked = locked || options.once;
+      firing = fired = true;
+      for ( ; queue.length; firingIndex = -1 ) {
+        memory = queue.shift();
+        while ( ++firingIndex < list.length ) {
+          if ( list[ firingIndex ].apply( memory[ 0 ], memory[ 1 ] ) === false && options.stopOnFalse ) {
+            firingIndex = list.length;
             memory = false;
           }
+        }
+      }
 
-          firing = false;
-          if ( locked ) {
-            if ( memory ) {
-              list = [];
-            } else {
-              list = "";
-            }
+      if ( !options.memory ) {
+        memory = false;
+      }
+
+      firing = false;
+      if ( locked ) {
+        if ( memory ) {
+          list = [];
+        } else {
+          list = "";
+        }
+      }
+    },
+    self = {
+      add: function() {
+        if ( list ) {
+          if ( memory && !firing ) {
+            firingIndex = list.length - 1;
+            queue.push( memory );
           }
-        },
-        self = {
-          add: function() {
-            if ( list ) {
-              if ( memory && !firing ) {
-                firingIndex = list.length - 1;
-                queue.push( memory );
-              }
-              ( function add( args ) {
-                jQuery.each( args, function( _, arg ) {
-                  if ( isFunction( arg ) ) {
-                    if ( !options.unique || !self.has( arg ) ) {
-                      list.push( arg );
-                    }
-                  } else if ( arg && arg.length && toType( arg ) !== 'string' ) {
-                    add( arg );
-                  }
-                } );
-              } )( arguments );
-
-              if ( memeory && !firing ) {
-                fire();
-              }
-            }
-            return this;
-          },
-          remove: function() {
-            jQuery.each( arguments, function( _, arg ) {
-              var index;
-              if ( index = jQuery.inArray( arg, list, index ) > -1 ) {
-                list.splice( index, 1 );
-              }
-              if ( index < firingIndex ) {
-                firingIndex--;
+          ( function add( args ) {
+            jQuery.each( args, function( _, arg ) {
+              if ( isFunction( arg ) ) {
+                if ( !options.unique || !self.has( arg ) ) {
+                  list.push( arg );
+                }
+              } else if ( arg && arg.length && toType( arg ) !== 'string' ) {
+                add( arg );
               }
             } );
-            return this;
-          },
-          has: function( fn ) {
-            return fn ? jQuery.inArray( fn, list ) > -1 : list.length > 0;
-          },
-          empty: function() {
-            if ( list ) {
-              list = [];
-            }
-            return this;
-          },
-          disable: function() {
-            locked = queue = [];
-            list = memory = "";
-            return this;
-          },
-          disabled: function() {
-            return !list;
-          },
-          lock: function() {
-            locked = queue = [];
-            if ( !memory && !firing ) {
-              list = queue = "";
-            }
-            return this;
-          },
-          locked: function() {
-            return !!locked;
-          },
-          fireWith: function( context, args ) {
-            if ( !locked ) {
-              args = args || [];
-              args = [ context, args.slice ? args.slice(), args ];
-              queue.push( args );
-              if ( !firing ) {
-                fire();
-              }
-            }
-            return this;
-          },
-          fire: function() {
-            self.fireWith( this, arguments );
-            return this;
-          },
-          fired: function() {
-            return !!fired;
+          } )( arguments );
+
+          if ( memeory && !firing ) {
+            fire();
           }
-        };
-
-      return self;
-    }
-
-    function Identity( v ) {
-      return v;
-    }
-
-    function Thrower( ex ) {
-      throw ex;
-    }
-
-    function adoptValue( value, resolve, reject, noValue ) {
-
-      var method;
-
-      try{
-        if ( value && isFunction( ( method = value.promise ) ) ) {
-          method.call( value ).done( resolve ).fail( reject );
         }
-        else if ( value && isFunction( ( method = value.then ) ) ) {
-          method.call( value, resolve, reject );
-        } else {
-          resolve.apply( undefined, [ value ].slice( noValue ) );
+        return this;
+      },
+      remove: function() {
+        jQuery.each( arguments, function( _, arg ) {
+          var index;
+          if ( index = jQuery.inArray( arg, list, index ) > -1 ) {
+            list.splice( index, 1 );
+          }
+          if ( index < firingIndex ) {
+            firingIndex--;
+          }
+        } );
+        return this;
+      },
+      has: function( fn ) {
+        return fn ? jQuery.inArray( fn, list ) > -1 : list.length > 0;
+      },
+      empty: function() {
+        if ( list ) {
+          list = [];
         }
-      } catch ( value ) {
-        reject.apply( undefined, [ value ] );
+        return this;
+      },
+      disable: function() {
+        locked = queue = [];
+        list = memory = "";
+        return this;
+      },
+      disabled: function() {
+        return !list;
+      },
+      lock: function() {
+        locked = queue = [];
+        if ( !memory && !firing ) {
+          list = queue = "";
+        }
+        return this;
+      },
+      locked: function() {
+        return !!locked;
+      },
+      fireWith: function( context, args ) {
+        if ( !locked ) {
+          args = args || [];
+          args = [ context, args.slice ? args.slice(), args ];
+          queue.push( args );
+          if ( !firing ) {
+            fire();
+          }
+        }
+        return this;
+      },
+      fire: function() {
+        self.fireWith( this, arguments );
+        return this;
+      },
+      fired: function() {
+        return !!fired;
       }
+    };
 
+  return self;
+}
+
+//------------------------------------------------------------------------------
+// jQuery.Deferred
+
+function Identity( v ) {
+  return v;
+}
+
+function Thrower( ex ) {
+  throw ex;
+}
+
+function adoptValue( value, resolve, reject, noValue ) {
+
+  var method;
+
+  try{
+    if ( value && isFunction( ( method = value.promise ) ) ) {
+      method.call( value ).done( resolve ).fail( reject );
     }
+    else if ( value && isFunction( ( method = value.then ) ) ) {
+      method.call( value, resolve, reject );
+    } else {
+      resolve.apply( undefined, [ value ].slice( noValue ) );
+    }
+  } catch ( value ) {
+    reject.apply( undefined, [ value ] );
+  }
 
-    jQuery.extend( {
-      Deffered: function( func ) {
+}
 
-        // notify 触发 progress 注册的 callbacks
-        // resolve 触发 done 注册的 callbacks
-        // reject 触发 fail 注册的 callbacks
-        // 同时所有 callbacks 可以通过 then() 注册
-        var tuples = [
-          [ "notify", "progress", jQuery.Callbacks( "memory" ),
-            jQuery.Callbacks( "memory" ), 2 ],
-          [ "resolve", "done", jQuery.Callbacks( "once memory" ),
-            jQuery.Callbacks( "once memory" ), 0, "resolved" ],
-          [ "reject", "fail", jQuery.Callbacks( "once memory" ),
-            jQuery.Callbacks( "once memory" ), 1, "rejected" ]
-        ],
+jQuery.extend( {
+  Deffered: function( func ) {
 
-        // 初始状态都为 pending，即等待状态
-        state = "pending",
+    // notify 触发 progress 注册的 callbacks
+    // resolve 触发 done 注册的 callbacks
+    // reject 触发 fail 注册的 callbacks
+    // 同时所有 callbacks 可以通过 then() 注册
+    var tuples = [
+      [ "notify", "progress", jQuery.Callbacks( "memory" ),
+        jQuery.Callbacks( "memory" ), 2 ],
+      [ "resolve", "done", jQuery.Callbacks( "once memory" ),
+        jQuery.Callbacks( "once memory" ), 0, "resolved" ],
+      [ "reject", "fail", jQuery.Callbacks( "once memory" ),
+        jQuery.Callbacks( "once memory" ), 1, "rejected" ]
+    ],
 
-        // promise 为向外暴露的安全的注册对象
-        promise = {
+    // 初始状态都为 pending，即等待状态
+    state = "pending",
 
-          state: function() {
-            return state;
-          },
-          always: function() {
-            // 同时向 done 和 fail 注册 callbacks
-            deferred.done( arguments ).fail( arguments );
-            return this;
-          },
-          "catch": function( fn ) {
-            // 将 fn 注册为 fail 的 callbacks
-            return promise.then( null, fn );
-          },
-          pipe: function( /* fnDone, fnFail, fnProgress */ ) {
+    // promise 为向外暴露的安全的注册对象
+    promise = {
 
-            var fns = arguments;
+      state: function() {
+        return state;
+      },
+      always: function() {
+        // 同时向 done 和 fail 注册 callbacks
+        deferred.done( arguments ).fail( arguments );
+        return this;
+      },
+      "catch": function( fn ) {
+        // 将 fn 注册为 fail 的 callbacks
+        return promise.then( null, fn );
+      },
+      pipe: function( /* fnDone, fnFail, fnProgress */ ) {
 
-            // return a new deferred's promise, the function will be called before the deferred return;
-            // 返回 promise，其中不含状态转移函数，更安全的处理方式
-            return jQuery.Deffered( function( newDefer ) {
+        var fns = arguments;
 
-              jQuery.each( tuples, function( i, tuple ) {
+        // return a new deferred's promise, the function will be called before the deferred return;
+        // 返回 promise，其中不含状态转移函数，更安全的处理方式
+        return jQuery.Deffered( function( newDefer ) {
 
-                var fn = isFunction( fns[ tuple[ 4 ] ] ) && fns[ tuple[ 4 ] ];
+          jQuery.each( tuples, function( i, tuple ) {
 
-                // deferred.progress(function() { bind to newDefer or newDefer.notify })
-                // 在原来的 deferred 中注册函数
-          			// deferred.done(function() { bind to newDefer or newDefer.resolve })
-          			// deferred.fail(function() { bind to newDefer or newDefer.reject })
-                deferred[ tuple[ 1 ] ]( function() {
-                  // 调用 fn
-                  // arguments 为 deferred 状态转移函数的传参，
-                  // 即调用该注册的 function 时的传参，该参数会引用状态转移函数的参数
-                  var returned = fn && fn.call( this, arguments );
-                  if ( returned && isFunction( returned.promise ) ) {
-                    // 若返回的对象中有 promise 方法，则将 newDefer 的状态转移方法注入，
-                    // 即返回的对象也有异步处理函数，其状态改变会触发 newDefer 的状态改变
-                    // newDefer 的状态会等待 returned 的状态改变
-                    returned.promise()
-                      .progress( newDefer.notify )
-                      .done( newDefer.resolve )
-                      .fail( newDefer.reject )
+            var fn = isFunction( fns[ tuple[ 4 ] ] ) && fns[ tuple[ 4 ] ];
+
+            // deferred.progress(function() { bind to newDefer or newDefer.notify })
+            // 在原来的 deferred 中注册函数
+      			// deferred.done(function() { bind to newDefer or newDefer.resolve })
+      			// deferred.fail(function() { bind to newDefer or newDefer.reject })
+            deferred[ tuple[ 1 ] ]( function() {
+              // 调用 fn
+              // arguments 为 deferred 状态转移函数的传参，
+              // 即调用该注册的 function 时的传参，该参数会引用状态转移函数的参数
+              var returned = fn && fn.call( this, arguments );
+              if ( returned && isFunction( returned.promise ) ) {
+                // 若返回的对象中有 promise 方法，则将 newDefer 的状态转移方法注入，
+                // 即返回的对象也有异步处理函数，其状态改变会触发 newDefer 的状态改变
+                // newDefer 的状态会等待 returned 的状态改变
+                returned.promise()
+                  .progress( newDefer.notify )
+                  .done( newDefer.resolve )
+                  .fail( newDefer.reject )
+              } else {
+                // 否则在 this 上下文中去调用状态转移方法
+                // 如果 fn 存在，就传入 fn 的返回值 returned
+                // 如果不存在，直接返回 arguments
+                newDefer[ tuple[ 0 ] + 'With' ](
+                  this,
+                  fn ? [ returned ] : arguments
+                );
+              }
+            } );
+          } );
+          // 当方法被调用完成后，变量 fns 置为 null
+          fns = null;
+        } ).promise();
+      },
+      then: function( onFulfilled, onRejected, onProgress ) {
+
+        var maxDepth = 0;
+
+        function resolve( depth, deferred, handler, special ) {
+
+          // 返回的 function 会注入调用该 then 方法的 deferred 的回调列表中
+          return function() {
+
+            // 继承状态转移方法传入的作用域
+            var that = this,
+              args = arguments,
+
+              // 解析主体逻辑函数
+              mightThrow = function() {
+
+                var returned, then;
+
+                // 多层嵌套异步操作时，如果当前深度小于最大深度，说明当前深度的异步操作已经被解析过了
+                // 目前状态是等待 maxDepth 深度的异步操作进行解析，所以直接返回不做任何操作
+                if ( depth < maxDepth ) {
+                  return;
+                }
+
+                // 调用 handler
+                returned = handler.apply( that, args );
+
+                // 参照 Promise|A+ 规范，返回结果如果是参数中 deferred 的 promise 引用，则抛出异常
+                // 否则会将自身的状态转移方法注入自己的回调队列中，如果是 notify 调用，会造成方法调用死循环
+                if ( returned === deferred.promise() ) {
+                  throw new TypeError( "Thenable self-resolution" );
+                }
+
+                // then 赋值
+                then = returned &&
+        					( typeof returned === "object" ||
+        						typeof returned === "function" ) &&
+        					returned.then;
+
+                // 如果 returned 是一个 deferred 对象或其他 promise 标准的实现，会调用其 then 方法注入回调
+                if ( isFunction( then ) ) {
+
+                  // special 是 notify 状态转移函数，这时不会增加异步深度，因为该异步对象根本没有被解析
+                  if ( special ) {
+                    then.call(
+                      returned,
+                      resolve( maxDepth, deferred, Indentity, special ),
+                      resolve( maxDepth, deferred, Thrower, special )
+                    );
                   } else {
-                    // 否则在 this 上下文中去调用状态转移方法
-                    // 如果 fn 存在，就传入 fn 的返回值 returned
-                    // 如果不存在，直接返回 arguments
-                    newDefer[ tuple[ 0 ] + 'With' ](
-                      this,
-                      fn ? [ returned ] : arguments
+
+                    // 如果没有 special，说明异步对象已经被解析了，而且 returned 也是一个异步对象
+                    // 说明有异步对象嵌套，于是深度 +1
+                    maxDepth++;
+
+                    then.call(
+                      returned,
+                      resolve( maxDepth, deferred, Indentity, special ),
+                      resolve( maxDepth, deferred, Thrower, special ),
+                      resolve( maxDepth, deferred, Identity,
+        								deferred.notifyWith )
                     );
                   }
-                } );
-              } );
-              // 当方法被调用完成后，变量 fns 置为 null
-              fns = null;
-            } ).promise();
-          },
-          then: function( onFulfilled, onRejected, onProgress ) {
-
-            var maxDepth = 0;
-
-            function resolve( depth, deferred, handler, special ) {
-
-              // 返回的 function 会注入调用该 then 方法的 deferred 的回调列表中
-              return function() {
-
-                // 继承状态转移方法传入的作用域
-                var that = this,
-                  args = arguments,
-
-                  // 解析主体逻辑函数
-                  mightThrow = function() {
-
-                    var returned, then;
-
-                    // 多层嵌套异步操作时，如果当前深度小于最大深度，说明当前深度的异步操作已经被解析过了
-                    // 目前状态是等待 maxDepth 深度的异步操作进行解析，所以直接返回不做任何操作
-                    if ( depth < maxDepth ) {
-                      return;
-                    }
-
-                    // 调用 handler
-                    returned = handler.apply( that, args );
-
-                    // 参照 Promise|A+ 规范，返回结果如果是参数中 deferred 的 promise 引用，则抛出异常
-                    // 否则会将自身的状态转移方法注入自己的回调队列中，如果是 notify 调用，会造成方法调用死循环
-                    if ( returned === deferred.promise() ) {
-                      throw new TypeError( "Thenable self-resolution" );
-                    }
-
-                    // then 赋值
-                    then = returned &&
-            					( typeof returned === "object" ||
-            						typeof returned === "function" ) &&
-            					returned.then;
-
-                    // 如果 returned 是一个 deferred 对象或其他 promise 标准的实现，会调用其 then 方法注入回调
-                    if ( isFunction( then ) ) {
-
-                      // special 是 notify 状态转移函数，这时不会增加异步深度，因为该异步对象根本没有被解析
-                      if ( special ) {
-                        then.call(
-                          returned,
-                          resolve( maxDepth, deferred, Indentity, special ),
-                          resolve( maxDepth, deferred, Thrower, special )
-                        );
-                      } else {
-
-                        // 如果没有 special，说明异步对象已经被解析了，而且 returned 也是一个异步对象
-                        // 说明有异步对象嵌套，于是深度 +1
-                        maxDepth++;
-
-                        then.call(
-                          returned,
-                          resolve( maxDepth, deferred, Indentity, special ),
-                          resolve( maxDepth, deferred, Thrower, special ),
-                          resolve( maxDepth, deferred, Identity,
-            								deferred.notifyWith )
-                        );
-                      }
-                    } else {
-
-                      // 否则，returned 就是要返回的 value 值
-                      if ( handler !== Indentity ) {
-
-                        // 此时 handler 就是自定义的回调，原来 deferred 解析的作用域不会影响新返回的 deferred
-                        // 原来的 deferred 即为调用 then 方法的 deferred
-                        // 新的 deferred 即为 resolve 方法传入的参数 deferred
-                        that = undefined;
-
-                        // 如果 handler 为自定义回调，解析的参数取决于其返回值
-                        // 否则就取决于状态转移方法调用时的入参
-                        args = [ returned ];
-                      }
-
-                      // handler 执行时未抛出异常，只能是 resolve 或 notify 调用
-                      // special 即为 notify 调用函数
-                      ( special || deferred.resolveWith )( that, args )
-                    }
-                  },
-
-                  // 如果有 special，则是 notify 调用，异步对象并没有被解析，不会抛出异常，直接用 mightThrow 即可
-                  // 否则需要捕获异常
-                  process = special ?
-                    mightThrow :
-                    function() {
-                      try {
-                        mightThrow()
-                      } catch ( e ) {
-
-                        // 在控制台中显示异常信息
-                        if ( jQuery.Deferred.exceptionHook ) {
-                          jQuery.Deferred.exceptionHook( e,
-            								process.stackTrace );
-                        }
-
-                        // 在已经解析过的深度发生的任何异常都忽略掉
-                        if ( depth + 1 >= maxDepth ) {
-
-            							if ( handler !== Thrower ) {
-            								that = undefined;
-            								args = [ e ];
-            							}
-
-                          // 说明该异步对象已经被完全解析，此时捕获的异常就是 reject 的参数
-                          // 当前解析的深度 >= maxDepth
-            							deferred.rejectWith( that, args );
-            						}
-                      }
-                    };
-
-                // 如果 depth 大于 0，则直接执行 process
-                if ( depth ) {
-                  process();
                 } else {
 
-            			if ( jQuery.Deferred.getStackHook ) {
-            				process.stackTrace = jQuery.Deferred.getStackHook();
-            			}
+                  // 否则，returned 就是要返回的 value 值
+                  if ( handler !== Indentity ) {
 
-                  // 否则设置异步执行
-            			window.setTimeout( process );
-            		}
-              };
-            }
+                    // 此时 handler 就是自定义的回调，原来 deferred 解析的作用域不会影响新返回的 deferred
+                    // 原来的 deferred 即为调用 then 方法的 deferred
+                    // 新的 deferred 即为 resolve 方法传入的参数 deferred
+                    that = undefined;
 
-            // 返回一个新的 deferred 实例的 promise 对象，使其可链式调用
-            // 并且在老的 deferred 实例的 回调列表中注入 resolve 函数
-            // 老的 deferred 实例的状态改变会调用注入的 resolve 函数，使其去改变新的 deferred 的状态
-            // 回调的返回值可能是一个 [deferred]，则将新 deferred 的 resolve 权交给返回值的 deferred
-            // 返回的 promise 和调用 then 的 promise 不会指向同一个对象
-            // 和 jQuery 的链式调用比较，jQuery 返回的对象如果调用 pushStack 返回，就不是原对象引用，如果是 this 返回，是原对象引用
-            return jQuery.Deffered( function( newDefer ) {
+                    // 如果 handler 为自定义回调，解析的参数取决于其返回值
+                    // 否则就取决于状态转移方法调用时的入参
+                    args = [ returned ];
+                  }
 
-              tuples[ 0 ][ 3 ].add(
-                resolve(
-                  0,
-                  newDefer,
-                  isFunction( onProgress ) ?
-                    onProgress :
-                    Indentity
-                )
-              );
+                  // handler 执行时未抛出异常，只能是 resolve 或 notify 调用
+                  // special 即为 notify 调用函数
+                  ( special || deferred.resolveWith )( that, args )
+                }
+              },
 
-              tuples[ 1 ][ 3 ].add(
-                resolve(
-                  0,
-                  newDefer,
-                  isFunction( onFulfilled ) ?
-                    onFulfilled :
-                    Indentity
-                )
-              );
+              // 如果有 special，则是 notify 调用，异步对象并没有被解析，不会抛出异常，直接用 mightThrow 即可
+              // 否则需要捕获异常
+              process = special ?
+                mightThrow :
+                function() {
+                  try {
+                    mightThrow()
+                  } catch ( e ) {
 
-              tuples[ 2 ][ 3 ].add(
-                resolve(
-                  0,
-                  newDefer,
-                  isFunction( onRejected ) ?
-                    onRejected :
-                    Thrower
-                )
-              );
+                    // 在控制台中显示异常信息
+                    if ( jQuery.Deferred.exceptionHook ) {
+                      jQuery.Deferred.exceptionHook( e,
+        								process.stackTrace );
+                    }
 
-            } ).promise();
-          },
-          promise: function( obj ) {
-            return obj !== null ? jQuery.extend( obj, promise ) : promise;
-          }
-        },
-        deferred = {};
-      jQuery.each( tuples, function( i, tuple ) {
-        var list = tuple[ 2 ],
-          stateString = tuple[ 5 ];
+                    // 在已经解析过的深度发生的任何异常都忽略掉
+                    if ( depth + 1 >= maxDepth ) {
 
-        // promise.progress()
-        // promise.fail()
-        // promise.done()
-        // 和 then 用的不是同一个回调列表
-        promise[ tuple[ 1 ] ] = list.add;
+        							if ( handler !== Thrower ) {
+        								that = undefined;
+        								args = [ e ];
+        							}
 
-        // 如果状态改变了，就作废另外一个状态的回调列表，并锁住 progress 的回调列表
-        if ( stateString ) {
-          list.add(
-      			function() {
+                      // 说明该异步对象已经被完全解析，此时捕获的异常就是 reject 的参数
+                      // 当前解析的深度 >= maxDepth
+        							deferred.rejectWith( that, args );
+        						}
+                  }
+                };
 
-      				// state = "resolved" (i.e., fulfilled)
-      				// state = "rejected"
-      				state = stateString;
-      			},
+            // 如果 depth 大于 0，则直接执行 process
+            if ( depth ) {
+              process();
+            } else {
 
-      			// rejected_callbacks.disable
-      			// fulfilled_callbacks.disable
-      			tuples[ 3 - i ][ 2 ].disable,
+        			if ( jQuery.Deferred.getStackHook ) {
+        				process.stackTrace = jQuery.Deferred.getStackHook();
+        			}
 
-      			// rejected_handlers.disable
-      			// fulfilled_handlers.disable
-      			tuples[ 3 - i ][ 3 ].disable,
-
-      			// progress_callbacks.lock
-      			tuples[ 0 ][ 2 ].lock,
-
-      			// progress_handlers.lock
-      			tuples[ 0 ][ 3 ].lock
-      		);
+              // 否则设置异步执行
+        			window.setTimeout( process );
+        		}
+          };
         }
 
-        // 同时触发 then 方法注册的回调
-        list.add( tuple[ 3 ].fire );
+        // 返回一个新的 deferred 实例的 promise 对象，使其可链式调用
+        // 并且在老的 deferred 实例的 回调列表中注入 resolve 函数
+        // 老的 deferred 实例的状态改变会调用注入的 resolve 函数，使其去改变新的 deferred 的状态
+        // 回调的返回值可能是一个 [deferred]，则将新 deferred 的 resolve 权交给返回值的 deferred
+        // 返回的 promise 和调用 then 的 promise 不会指向同一个对象
+        // 和 jQuery 的链式调用比较，jQuery 返回的对象如果调用 pushStack 返回，就不是原对象引用，如果是 this 返回，是原对象引用
+        return jQuery.Deffered( function( newDefer ) {
 
-        deferred[ tuple[ 0 ] ] = function() {
-      		deferred[ tuple[ 0 ] + "With" ]( this === deferred ? undefined : this, arguments );
-      		return this;
-      	};
+          tuples[ 0 ][ 3 ].add(
+            resolve(
+              0,
+              newDefer,
+              isFunction( onProgress ) ?
+                onProgress :
+                Indentity
+            )
+          );
 
-      	// deferred.notifyWith = list.fireWith
-      	// deferred.resolveWith = list.fireWith
-      	// deferred.rejectWith = list.fireWith
-      	deferred[ tuple[ 0 ] + "With" ] = list.fireWith;
+          tuples[ 1 ][ 3 ].add(
+            resolve(
+              0,
+              newDefer,
+              isFunction( onFulfilled ) ?
+                onFulfilled :
+                Indentity
+            )
+          );
 
+          tuples[ 2 ][ 3 ].add(
+            resolve(
+              0,
+              newDefer,
+              isFunction( onRejected ) ?
+                onRejected :
+                Thrower
+            )
+          );
+
+        } ).promise();
+      },
+      promise: function( obj ) {
+        return obj !== null ? jQuery.extend( obj, promise ) : promise;
+      }
+    },
+    deferred = {};
+  jQuery.each( tuples, function( i, tuple ) {
+    var list = tuple[ 2 ],
+      stateString = tuple[ 5 ];
+
+    // promise.progress()
+    // promise.fail()
+    // promise.done()
+    // 和 then 用的不是同一个回调列表
+    promise[ tuple[ 1 ] ] = list.add;
+
+    // 如果状态改变了，就作废另外一个状态的回调列表，并锁住 progress 的回调列表
+    if ( stateString ) {
+      list.add(
+  			function() {
+
+  				// state = "resolved" (i.e., fulfilled)
+  				// state = "rejected"
+  				state = stateString;
+  			},
+
+  			// rejected_callbacks.disable
+  			// fulfilled_callbacks.disable
+  			tuples[ 3 - i ][ 2 ].disable,
+
+  			// rejected_handlers.disable
+  			// fulfilled_handlers.disable
+  			tuples[ 3 - i ][ 3 ].disable,
+
+  			// progress_callbacks.lock
+  			tuples[ 0 ][ 2 ].lock,
+
+  			// progress_handlers.lock
+  			tuples[ 0 ][ 3 ].lock
+  		);
+    }
+
+    // 同时触发 then 方法注册的回调
+    list.add( tuple[ 3 ].fire );
+
+    deferred[ tuple[ 0 ] ] = function() {
+  		deferred[ tuple[ 0 ] + "With" ]( this === deferred ? undefined : this, arguments );
+  		return this;
+  	};
+
+  	// deferred.notifyWith = list.fireWith
+  	// deferred.resolveWith = list.fireWith
+  	// deferred.rejectWith = list.fireWith
+  	deferred[ tuple[ 0 ] + "With" ] = list.fireWith;
+
+  } );
+
+  promise.promise( deferred );
+
+  if ( func ) {
+    func.call( deferred, deferred );
+  }
+  return deferred;
+},
+// when 的参数可以是一个或多个同步或异步对象
+// 如果是同步对象，then 注册的回调会立即执行
+// 如果是异步对象，则需要所有的异步对象都解析后 then 中回调再执行
+// then 中 onFullFilled 只有在所有异步对象都 resolve 后才执行
+when: function( singleValue ) {
+  var remaining = arguments.length,
+    i = remaining,
+    resolveContexts = Array( i ),
+    resolveValues = slice.call( arguments ),
+    master = jQuery.Deferred(),
+
+    updateFunc = function( i ) {
+      return function( value ) {
+        resolveContexts[ i ] = this;
+				resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
+				if ( !( --remaining ) ) {
+					master.resolveWith( resolveContexts, resolveValues );
+				}
+      }
+    };
+
+  // 处理参数为单个和没有参数的情况
+  if ( remaining <= 1 ) {
+
+    // 将 updateFunc 注入 master 的回调中
+    // 如果 singleValue 是异步对象，就把 master 的解析交给 singleValue
+    // 如果 singleValue 是非异步对象，就立即解析 master
+    // 执行过程中的任何异常都会导致 master.reject 执行
+    // remaining 用于表示是否还有剩余的未解析对象
+    adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject, !remaining );
+
+    // 如果 singleValue 是一个异步对象，就返回 master 的 promise
+    // 即当 when 返回的对象注册的回调会在 singleValue 解析后执行
+    if ( master.state() === "pending" || isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
+
+      return master.then();
+    }
+
+  }
+
+  // 解决数组错位
+  while ( i-- ) {
+    adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+  }
+
+  return master.promise();
+}
+} );
+
+// 定义 jQuery 里的异常类型
+var rerrorNames = /^(Eval|Internal|Range|Reference|Syntax|Type|URI)Error$/;
+
+// 定义 Deferred 里的异常钩子函数，当 catch 到异常时一般会执行该函数
+jQuery.Deferred.exceptionHook = function( error, stack ) {
+
+	// Support: IE 8 - 9 only
+	// Console exists when dev tools are open, which can happen at any time
+	if ( window.console && window.console.warn && error && rerrorNames.test( error.name ) ) {
+		window.console.warn( "jQuery.Deferred exception: " + error.message, error.stack, stack );
+	}
+};
+
+//------------------------------------------------------------------------------
+// jQuery.ready
+
+// 定义 ready 异常，用于在 jQuery.ready 中发生异常时抛出
+jQuery.readyException = function( error ) {
+	window.setTimeout( function() {
+		throw error;
+	} );
+};
+
+// 定义就绪队列
+var readyList = jQuery.Deferred();
+
+// $().ready 即是往异步对象里添加成功回调
+jQuery.fn.ready = function( fn ) {
+  readyList.then(
+    fn
+  ).catch( function( error ) {
+    jQuery.readyException( error );
+  } );
+  return this;
+};
+
+// 定义 jQuery.ready
+jQuery.extend( {
+  isReady: false,
+  readyWait: 1,
+  ready: function( wait ) {
+    // 如果有 wait 参数且 readyWait > 1 就不作任何操作
+    // 如果没有 wait 参数，就判断 isReady 状态，如果就绪，也不做任何操作
+    if ( wait === true ? --jQuery.readyWait : jQuery.isReady ) {
+      return;
+    }
+    // 否则 jQuery 的状态置为就绪
+    jQuery.isReady = true;
+    // 如果没有 wait 参数并且 readyWait > 1 则不触发回调
+    if ( wait !== true && --jQuery.readyWait > 0 ) {
+      return;
+    }
+    // 否则触发所有实例注册的回调
+    readyList.resolveWith( document, [ jQuery ] );
+  }
+} );
+
+jQuery.ready.then = readyList.then;
+
+// 定义文档加载完成后的回调
+// 清除监听，并使 jQuery 的状态就绪
+function completed() {
+  document.removeEventListener( 'DOMContentLoaded', completed );
+  window.removeEventListener( 'load', completed );
+  jQuery.ready();
+}
+
+// 如果文档已经加载就绪
+// 就让 jQuery 状态就绪
+if ( document.readyState === 'complete' ||
+  ( document.readyState !== 'loading' !document.documentElement.doScroll ) ) {
+    window.setTimeout( jQuery.ready );
+} else {
+  // 否则，添加事件监听和回调
+  document.addEventListener( 'DOMContentLoaded', completed );
+  window.addEventListener( 'load', completed );
+}
+
+
+//------------------------------------------------------------------------------
+// jQuery.Data
+
+// 用于对集合的值进行 get 和 set，用于设置 dom 的属性值等
+// 作为 jQuery 内的辅助函数被调用
+var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
+  var i = 0,
+    len = elems.length,
+    bulk = key == null;
+
+  // 先判断是否是 set 操作
+  // set 操作可链式调用，chainable = true
+  if ( toType( key ) === 'object' ) {
+    // 多值 set 操作
+    chainable = true;
+    for ( i in key ) {
+      access( elems, fn, i, key[ i ], true, emptyGet, raw );
+    }
+  } else if ( value !== undefined ) {
+
+    // 单值 set 操作
+    // 分多种情况
+    // 1. key == null
+    //  1.1 value 不为 function -处理方法依赖于 fn，且 fn 会被立即调用
+    //  1.2 value 为 function -处理方法依赖于 fn，且 fn 会被重新包装
+    // 2. key != null
+    //  2.1 value 不为 function
+    //  2.2 value 为 function
+    chainable = true;
+
+    // 标记 value 是否是一个平凡值
+    if ( !isFunction( value ) ) {
+      raw = true;
+    }
+
+    // 处理 key == null 的情况
+    if ( bulk ) {
+
+      // 如果未传入 key 且 value 是一个平凡值
+      if ( raw ) {
+        fn.call( elems, value );
+        fn = null;
+      } else {
+        // 否则，修正 fn
+        bulk = fn;
+        fn = function( elem, key, value ) {
+          return bulk.call( jQuery( elem ), value );
+        };
+      }
+    }
+
+    if ( fn ) {
+      // 处理 key != null，或者 key == null 且 value 为 function 的情况
+      // fn 实际是一个与 jQuery 实例耦合的 access 方法
+      // 1. 如果 value 为 function，且 key 不为空，value 的入参为：
+      //  - i 当前节点下标
+      //  - value, 根据 key 从当前节点取出的属性值
+      for ( ; i < len; i++ ) {
+        fn( elems[ i ], key, raw ? value : value.call( elems[ i ], i, fn( elems[ i ], key ) ) );
+      }
+    }
+  }
+
+  // 如果 chainable 为真，此时 set 操作已经完成，返回 elems 即可
+  if ( chainable ) {
+    return elems;
+  }
+
+  // 否则进行 get 操作
+  // 如果 key == null，返回所有数据
+  if ( bulk ) {
+    return fn.call( elems );
+  }
+
+  // 如果 elems 不为空，就从第一个节点取数据，否则返回指定空值
+  return len ? fn( elems[ 0 ], key ) : emptyGet;
+};
+
+// 处理浏览器前缀问题
+var rmsPrefix = /^-ms-/,
+  rdashAlpha = /-([a-z])/g;
+
+function fcamelCase( all, letter ) {
+  return letter.toUpperCase();
+}
+
+function camelCase( string ) {
+  return string.replace( rmsPrefix, "ms-" ).replace( rdashAlpha, fcamelCase );
+}
+
+var acceptData = function( owner ) {
+  // Accepts only:
+	//  - Node
+	//    - Node.ELEMENT_NODE
+	//    - Node.DOCUMENT_NODE
+	//  - Object
+	//    - Any
+  return owner.nodeType === 1 || owner.nodeType = 9 || !( +owner.nodeType );
+}
+
+// 定义 Data 构造器
+function Data() {
+  this.expando = jQuery.expando + Data.uid++;
+}
+
+Data.uid = 1;
+
+Data.prototype = {
+
+  // 获取 owner 的缓存对象，如果没有就创建一个，可接受的 owner 参照 acceptData 函数
+  cache: function( owner ) {
+
+    // 检查该 Data 对象在 owner 上是否已经有缓存
+    // 如果有，就是直接返回 value
+    var value = owner[ this.expando ];
+
+    // 如果没有就创建一个缓存对象并返回
+    if ( !value ) {
+      value = {};
+
+      if ( acceptData( owner) ) {
+
+        // 判断 owner 是节点还是普通对象
+        if ( owner.nodeType ) {
+          owner[ this.expando ] = value;
+        } else {
+          Object.defineProperty( value, this.expando, {
+            value: value,
+            configurable: true
+          } );
+        }
+      }
+    }
+    return value;
+  },
+
+  set: function( owner, data, value ) {
+    var prop,
+      cache = this.cache( owner );
+
+    // 如果 data 是字符串，则是单值 set，就直接放入缓存中
+    if ( typeof data === 'string' ) {
+      cache[ camelCase( data ) ] = value;
+    } else {
+      // 如果 data 是对象，就遍历存入缓存中
+      for ( prop in data ) {
+        cache[ camelCase( prop ) ] = data[ prop ];
+      }
+    }
+    return cache;
+  },
+
+  get: function( owner, key ) {
+    // 如果 key == undefined，就直接返回一个缓存对象
+    // 否则返回 key 对应的 value
+    return key === undefined ?
+      this.cache( owner ) :
+      owner[ this.expando ] && owner[ this.expando ][ camelCase( key ) ];
+  },
+
+  // set get 方法的组合
+  access: function( owner, key, value ) {
+
+    // 判定是 owner 操作
+    if ( key === undefined ||
+        ( ( key && typeof key === 'string' ) && value === undefined ) ) {
+      return this.get( owner, key );
+    }
+
+    // 否则是 set 操作
+    this.set( owner, key, value );
+
+    // 判断单值操作或多值操作返回不同的结果
+    return value !== undefined ? value : key;
+  },
+  remove: function( owner, key ) {
+    var i,
+      cache = owner[ this.expando ];
+    if ( cache === undefined ) {
+      return;
+    }
+    if ( key !== undefined ) {
+      if ( Array.isArray( key ) ) {
+        key = key.map( camelCase );
+      } else {
+        // 格式化 key
+        key = camelCase( key );
+        key = key in cache ? [ key ] : ( key.match( rnothtmlwhite ) || [] );
+      }
+      i = key.length;
+      while( i-- ) {
+        delete cache[ key[ i ] ];
+      }
+    }
+
+    // key 未定义或缓存为空的情况
+    // 直接删除缓存对象
+    if ( key === undefined || jQuery.isEmptyObject( cache ) ) {
+      if ( owner.nodeType ) {
+        owner[ this.expando ] = undefined;
+      } else {
+        delete owner[ this.expando ]
+      }
+    }
+  },
+
+  hasData: function( owner ) {
+    var cache = owner[ this.expando ];
+    return cache !== undefined && !jQuery.isEmptyObject( cache );
+  }
+}
+
+// 私有缓存
+var dataPriv = new Data();
+// 公有缓存
+var dataUser = new Data();
+
+var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/, // 匹配对象或数组
+	rmultiDash = /[A-Z]/g;
+
+// 解析字符串形式的 data
+function getData( data ) {
+
+  if ( data === "true" ) {
+		return true;
+	}
+
+	if ( data === "false" ) {
+		return false;
+	}
+
+	if ( data === "null" ) {
+		return null;
+	}
+
+	if ( data === +data + "" ) {
+		return +data;
+	}
+
+	if ( rbrace.test( data ) ) {
+		return JSON.parse( data );
+	}
+	return data;
+}
+
+// 将 html5 data 属性注入缓存
+function dataAttr( elem, key, data ) {
+  var name;
+
+  if ( data === undefined && elem.nodeType === 1 ) {
+    name = "data-" + key.replace( rmultiDash, "-$&" ).toLowerCase();
+    data = element.getAttribute( name );
+    if ( typeof data === "string" ) {
+      try {
+        data = getData( data );
+      } catch ( e ) {}
+    }
+    // 将 elem 上的私有属性放入缓存中，用 dataUser 来标记
+    dataUser.set( elem, key, data );
+  } else {
+    data = undefined;
+  }
+  return data;
+}
+
+jQuery.extend( {
+  hasData: function( elem ) {
+    return dataUser.hasData( elem ) || dataPriv.hasData( elem );
+  },
+  data: function( elem, name, data ) {
+    return dataUser.access( elem, name, data );
+  },
+  removeData: function( elem, name ) {
+    return dataUser.remove( elem, name );
+  },
+  _data: function( elem, name, data ) {
+    return dataPriv.access( elem, name, data );
+  },
+  _removeData: function( elem, name ) {
+    return dataPriv.remove( elem, name );
+  }
+} );
+
+jQuery.fn.extend( {
+  data: function( key, value ) {
+    var i, name, data,
+      elem = this[ 0 ],
+      attrs = elem && elem.attributes;
+
+    // 如果 key 未定义，就对节点数据进行缓存并返回整个缓存
+    if ( key === undefined ) {
+      if ( this.length ) {
+
+        // 获取自身第一个节点的缓存数据
+        data = dataUser.get( elem );
+
+        // 如果节点类型是元素节点并且没有将 data- 属性存入 dataUser
+        // 就遍历缓存，取出 data- 属性，存入 dataUser
+        if ( elem.nodeType === 1 && !dataPriv.get( elem, "hasDataAttrs") ) {
+          i = attrs.length;
+          while ( i-- ) {
+            if ( attrs[ i ] ) {
+              name = attrs[ i ].name;
+              if ( name.indexOf( "data-" ) === 0 ) {
+                name = camelCase( name.slice( 5 ) );
+                dataAttr( elem, name, data[ name ] );
+              }
+            }
+          }
+          dataPriv.set( "hasDataAttrs", true );
+        }
+      }
+      return data;
+    }
+
+    // 多值属性
+    // 在每一个节点上都设置缓存
+    if ( typeof key === "object" ) {
+      return this.each( function() {
+        dataUser.set( this, key )
+      } );
+    }
+
+    // 处理 key 为单值情况的 get 和 set
+    return access( this, function( value ) {
+
+      var data;
+
+      // 节点存在但 value 未定义，则是 get 操作
+      if ( elem && value === undefined ) {
+
+        // 先从 dataUser 里取
+        data = dataUser.get( elem, key );
+        if ( data !== undefined ) {
+          return data;
+        }
+
+        // 如果 dataUser 没有，就从节点的 data- 属性值里取，并存入 dataUser
+        data = dataAttr( elem, key );
+        if ( data !== undefined ) {
+          return data;
+        }
+
+        // 如果都未取到，则返回空
+        return;
+      }
+
+      // 否则进行 set 操作
+      this.each( function() {
+
+        // 注意，这里 this 指向 jQuery 实例里的每一个元素节点
+        dataUser.set( this, key ,value );
       } );
 
-      promise.promise( deferred );
+    }, null, value, arguments.length > 1, null, true );
+  },
+  removeData( key ) {
+    return this.each( function() {
+      dataUser.remove( this, key );
+    } );
+  }
+} );
 
-      if ( func ) {
-        func.call( deferred, deferred );
+
+// -----------------------------------------------------------------------------
+// jQuery 队列
+
+jQuery.extend( {
+
+  // 在元素上定义回调队列，或数据队列
+  // 采用懒执行，如果没有队列，就新建一个
+  queue: function( elem, type, data ) {
+    var queue;
+    if ( elem ) {
+      type = ( type || "fx" ) + "queue";
+      queue = dataPriv.access( elem, type );
+      if ( data ) {
+        if ( !queue || Array.isArray( data ) ) {
+          queue = dataPriv.access( elem, type, jQuery.makeArray( data ) );
+        } else {
+          queue.push( data );
+        }
       }
-      return deferred;
-    },
-    // when 的参数可以是一个或多个同步或异步对象
-    // 如果是同步对象，then 注册的回调会立即执行
-    // 如果是异步对象，则需要所有的异步对象都解析后 then 中回调再执行
-    // then 中 onFullFilled 只有在所有异步对象都 resolve 后才执行
-    when: function( singleValue ) {
-      var remaining = arguments.length,
-        i = remaining,
-        resolveContexts = Array( i ),
-        resolveValues = slice.call( arguments ),
-        master = jQuery.Deferred(),
+      return queue || [];
+    }
+  },
 
-        updateFunc = function( i ) {
-          return function( value ) {
-            resolveContexts[ i ] = this;
-  					resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
-  					if ( !( --remaining ) ) {
-  						master.resolveWith( resolveContexts, resolveValues );
-  					}
-          }
-        };
+  // 元素上的队列出队
+  dequeue: function( elem, type ) {
+     type = type || "fx";
+     var queue = jQuery.queue( elem, type ),
+      startLength = queue.length,
+      fn = queue.shift(),
+      hooks = jQuery._queueHooks( elem, type ),
+      next = function() {
+        jQuery.dequeue( elem, type );
+      };
 
-      // 处理参数为单个和没有参数的情况
-      if ( remaining <= 1 ) {
+      // 只针对 fx queue 进行长度自减
+      if ( fn === "inprogress" ) {
+        fn = queue.shift();
+        startLength--;
+      }
 
-        // 将 updateFunc 注入 master 的回调中
-        // 如果 singleValue 是异步对象，就把 master 的解析交给 singleValue
-        // 如果 singleValue 是非异步对象，就立即解析 master
-        // 执行过程中的任何异常都会导致 master.reject 执行
-        // remaining 用于表示是否还有剩余的未解析对象
-        // master 会被解析两次？？
-        adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject, !remaining );
-
-        // 如果 singleValue 是一个异步对象，就返回 master 的 promise
-        // 即当 when 返回的对象注册的回调会在 singleValue 解析后执行
-        if ( master.state() === "pending" || isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
-          return master.then();
+      // fn 出队执行
+      // 如果没有传入 type，就向队首推入 inprogress 状态
+      if ( fn ) {
+        if ( type === "fx" ) {
+          queue.unshift( "inprogress" );
         }
 
-        // 否则 master 的状态已经变成 fulfilled 或 rejected，此时 i = [ 0 || 1 ]
+        delete hooks.stop;
+
+        // fn 执行完成后可以触发下一次的 dequeue
+        // 并且可以触发钩子函数
+        fn.call( elem, next, hooks );
       }
 
-      while ( i-- ) {
-        adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+      // 如果队列清空且有钩子对象，就触发 hooks.empty 钩子
+      // 移除元素上的队列和相应的钩子
+      if ( !startLength && hooks ) {
+        hooks.empty.fire();
       }
+  },
 
-      return master.promise();
+  _queueHooks: function( elem, type ) {
+    var key = type + "queueHooks";
+    return dataPriv.get( elem, key ) || dataPriv.access( elem, key, {
+      empty: jQuery.Callbacks("once memory").add( function() {
+        dataPriv.remove( elem, [ type + "queue", key ] );
+      } )
+    } );
+  }
+} );
+
+
+
+jQuery.fn.extend( {
+  queue: function( type, data ) {
+    var setter = 2;
+    if ( typeof type !== "string" ) {
+      data = type;
+      type = "fx";
+      setter--;
     }
-  } );
+
+    if ( arguments.length < setter ) {
+      return jQuery.queue( this[ 0 ], type );
+    }
+
+    return data === undefined ?
+      this :
+      this.each( function() {
+        var queue = jQuery.queue( this, type, data );
+        jQuery._queueHooks( this, type );
+        if ( type === "fx" && queue[ 0 ] !== "inprogress" ) {
+          jQuery.dequeue( this, type );
+        }
+      } );
+  },
+  dequeue: function( type ) {
+    this.each( function() {
+      jQuery.dequeue( this, type );
+    } );
+  },
+  _queueHooks: function( type ) {
+    this.each( function() {
+      jQuery._queueHooks( this, type );
+    } );
+  },
+  clearQueue: function( type ) {
+    return this.queue( type || "fx", [] );
+  },
+  promise: function( type, obj ) {
+    var tmp,
+      count = 1,
+      defer = jQuery.Deferred(),
+      elements = this,
+      i = this.length,
+      resolve = function() {
+        if ( !(--count) ) {
+          defer.resolveWith( elements, [ elements ] );
+        }
+      };
+
+    if ( typeof type !== "string" ) {
+      obj = type;
+      type = undefined;
+    }
+
+    type = type || "fx";
+
+    while ( i-- ) {
+      tmp = dataPriv.get( elements[ i ], type + "queueHooks" );
+      if ( tmp && tmp.empty ) {
+        count++;
+        tmp.empty.add( resolve );
+      }
+    }
+    resolve();
+    return defer.promise( obj );
+  }
+} );
 
 module.exports = jQuery

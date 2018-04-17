@@ -1730,14 +1730,21 @@ jQuery.fn.extend( {
   }
 } );
 
-
 // -----------------------------------------------------------------------------
-// jQuery 队列
+/**
+ * [ 实现队列方法 ]
+ * @type {[type]}
+ */
 
 jQuery.extend( {
 
-  // 在元素上定义回调队列，或数据队列
-  // 采用懒执行，如果没有队列，就新建一个
+  /**
+   * [ 入队操作 ]
+   * @param {[type]} elem [ 元素节点 ]
+   * @param {[type]} type [ 队列名称，默认是 fxqueue]
+   * @param {[type]} data [ 回调函数，可以是单个 function，也可以是数组 ]
+   * @return {[type]} [ 返回入队后的队列 ]
+   */
   queue: function( elem, type, data ) {
     var queue;
     if ( elem ) {
@@ -1754,7 +1761,19 @@ jQuery.extend( {
     }
   },
 
-  // 元素上的队列出队
+  /**
+   * [ 出队操作 ]
+   * @param {[type]} elem [ 元素节点 ]
+   * @param {[type]} type [ 队列名称，默认 fxqueue ]
+   * @return {[type]} [ undefined ]
+   * @desc
+   * 1、取出队列，并且进行一次 shift() 出队
+   * 2、定义 next 方法为下一次出队
+   * 3、如果上一次出队的元素为 'inprogress'，就重新出队
+   * 4、如果是 fx 会增加一次入出队操作，导致 startLength 自减
+   * 5、自定义队列是不会触发 startLength 自减，也就不会自动触发 queueHook 执行，但是可以在回调函数里自己操作 hooks
+   * 6、默认队列为空时，会触发 queueHook.empty 里的回调执行
+   */
   dequeue: function( elem, type ) {
      type = type || "fx";
      var queue = jQuery.queue( elem, type ),
@@ -1765,14 +1784,11 @@ jQuery.extend( {
         jQuery.dequeue( elem, type );
       };
 
-      // 只针对 fx queue 进行长度自减
       if ( fn === "inprogress" ) {
         fn = queue.shift();
         startLength--;
       }
 
-      // fn 出队执行
-      // 如果没有传入 type，就向队首推入 inprogress 状态
       if ( fn ) {
         if ( type === "fx" ) {
           queue.unshift( "inprogress" );
@@ -1780,18 +1796,22 @@ jQuery.extend( {
 
         delete hooks.stop;
 
-        // fn 执行完成后可以触发下一次的 dequeue
-        // 并且可以触发钩子函数
         fn.call( elem, next, hooks );
       }
 
-      // 如果队列清空且有钩子对象，就触发 hooks.empty 钩子
-      // 移除元素上的队列和相应的钩子
       if ( !startLength && hooks ) {
         hooks.empty.fire();
       }
   },
-
+  /**
+   * [ 队列的事件钩子对象 ]
+   * @param {[type]} elem [ 元素 ]
+   * @param {[type]} type [ 队列名 ]
+   * @return {[type]} [ 返回元素上的缓存对象 ]
+   * @desc
+   * 1、如果 dataPriv 中有 Hook 定义，就获取，否则就定义一个
+   * 3、empty 里有一个默认方法，在队列为空时就移除队列和相应 Hook
+   */
   _queueHooks: function( elem, type ) {
     var key = type + "queueHooks";
     return dataPriv.get( elem, key ) || dataPriv.access( elem, key, {
@@ -1803,8 +1823,18 @@ jQuery.extend( {
 } );
 
 
-
+/**
+ * [queue 注入原型的方法]
+ * @type {[type]}
+ */
 jQuery.fn.extend( {
+
+  /**
+   * [description]
+   * @param {[type]} type [ 队列名 ]
+   * @param {[type]} data [ 函数列表 ]
+   * @return {[type]} [description]
+   */
   queue: function( type, data ) {
     var setter = 2;
     if ( typeof type !== "string" ) {
@@ -1813,33 +1843,71 @@ jQuery.fn.extend( {
       setter--;
     }
 
+    // setter 为 2 说明传入了 type 和 data
+    // setter 为 1 说明只传入了 data
+    // 如果 arguments < setter，说明没有传 data
+    // 如果没有传 data，就认为是获取队列实例的操作，而非入队操作
     if ( arguments.length < setter ) {
       return jQuery.queue( this[ 0 ], type );
     }
 
+    // 否则执行入队操作
+    // 如果 data 未定义，就返回 jQuery 实例
+    // 否则对每一个 elem 进行 data 入队，并且创建对应的 Hooks，然后返回 this
     return data === undefined ?
       this :
       this.each( function() {
         var queue = jQuery.queue( this, type, data );
         jQuery._queueHooks( this, type );
+
+        // 如果未默认队列并且队列中第一个函数不为 'inprogress'
+        // 即该队列一定是新建的队列而非未出完队的队列
+        // 就立即出队第一个函数
+        // queue[ 0 ] === "inprogress" 的情况为，队列在最后一次函数执行时没有进行 next() 调用
         if ( type === "fx" && queue[ 0 ] !== "inprogress" ) {
           jQuery.dequeue( this, type );
         }
       } );
   },
+
+  /**
+   * [ 在 this 上调用 出队方法 ]
+   * @param {[type]} type [description]
+   * @return {[type]} [description]
+   */
   dequeue: function( type ) {
     this.each( function() {
       jQuery.dequeue( this, type );
     } );
   },
+
+  /**
+   * [ 在 this 上调用 _queueHooks 方法 ]
+   * @param {[type]} type [description]
+   * @return {[type]} [description]
+   */
   _queueHooks: function( type ) {
     this.each( function() {
       jQuery._queueHooks( this, type );
     } );
   },
+
+  // 清空队列
+  // *queue 是直接替换而不是 merge
   clearQueue: function( type ) {
     return this.queue( type || "fx", [] );
   },
+
+  /**
+   * [ 返回队列执行的异步对象 ]
+   * @param {[type]} type [ 队列名称 ]
+   * @param {[type]} obj  [ 载体对象，promise 的特性会混入该对象中 ]
+   * @return {[type]} [description]
+   * @desc
+   * 1、如果 this 没有元素节点，返回的实际是已经解析过的异步对象
+   * 2、elem 元素节点的队列中如果有 empty 钩子，计数 +1，empty 钩子触发时会使计数 -1，表明该元素上的队列已被清空
+   * 3、当所有 elem 上的队列清空后，promise 被解析
+   */
   promise: function( type, obj ) {
     var tmp,
       count = 1,
@@ -1870,5 +1938,9 @@ jQuery.fn.extend( {
     return defer.promise( obj );
   }
 } );
+
+
+// -----------------------------------------------------------------------------
+// css 一类方法实现
 
 module.exports = jQuery

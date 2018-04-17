@@ -1,7 +1,11 @@
-import './index.css'
 const $ = require("../dist/jquery-3.3.1");
 
-$('.a').data( 'test', '123' );
-$('.b').data( 'test', '456' );
-
-console.log( $('div').data() )
+$('.a').queue(
+  function( next, hooks ) {
+    hooks.empty.add( function() { console.log( 'empty' ) } );
+    this.style.width = '100px';
+    this.style.height = '100px';
+    this.style.background = 'red';
+    next()
+  }
+)

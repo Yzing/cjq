@@ -50,15 +50,22 @@ var isWindow = function isWindow( obj ) {
 };
 
 
-
-
+/**
+ * [ 保留的 script 节点属性 ]
+ * @type {Object}
+ */
 var preservedScriptAttributes = {
 	type: true,
 	src: true,
 	noModule: true
 };
 
-// execise js
+/**
+ * [ 执行全局 js ]
+ * @param       {[type]} code [ 要执行的 js 代码 ]
+ * @param       {[type]} doc  [ 执行的上下文环境 ]
+ * @param       {[type]} node [ 属性配置对象 ]
+ */
 function DOMEval( code, doc, node ) {
 	doc = doc || document;
 
@@ -76,7 +83,12 @@ function DOMEval( code, doc, node ) {
 	doc.head.appendChild( script ).parentNode.removeChild( script );
 }
 
-
+/**
+ * [ 将对象类型转化成字符串形式 ]
+ * @param  {[type]} obj [description]
+ * @return {[type]}     [description]
+ * @desc class2type 中存放了相应对照
+ */
 function toType( obj ) {
 	if ( obj == null ) {
 		return obj + "";
@@ -88,9 +100,13 @@ function toType( obj ) {
 		typeof obj;
 }
 
+// 匹配行首行尾空格
 var rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
 
-// core, make the jQuery has some array's feature
+/**
+ * [ jQUery 原型核心 ]
+ * @type {Function}
+ */
 jQuery.fn = jQuery.prototype = {
 
   constructor: jQuery,
@@ -99,10 +115,23 @@ jQuery.fn = jQuery.prototype = {
 
   length: 0,
 
+  /**
+   * [ 转数组方法 ]
+   * @return {[type]} [description]
+   * @desc jQuery 实例本身继承了数组特性，该方法能将 jQuery 对象转化成元素集合数组
+   */
   toArray: function() {
     return slice.call( this );
   },
 
+  /**
+   * [ 根据下标获取 jQuery 实例中的元素节点 ]
+   * @param  {[type]} num [ 下标值 ]
+   * @return {[type]}     [ elememt ]
+   * @desc
+   * 1、如果传入空，将返回所有
+   * 2、传入负数就逆向获取
+   */
   get: function( num ) {
 
 		// Return all the elements in a clean array
@@ -114,6 +143,14 @@ jQuery.fn = jQuery.prototype = {
 		return num < 0 ? this[ num + this.length ] : this[ num ];
 	},
 
+  /**
+   * [ 实现实例回溯的核心方法 ]
+   * @param  {[type]} elems [ 新的元素集合 ]
+   * @return {[type]}       [ 新的就 Query 实例 ]
+   * @desc
+   * 1、用传入的元素节点构造 jQuery 对象并返回
+   * 2、将原有对象的引用保存在 prevObject 中
+   */
   pushStack: function( elems ) {
 
     var ret = jQuery.merge( this.constructor(), elems );
@@ -128,16 +165,19 @@ jQuery.fn = jQuery.prototype = {
     return jQuery.each( this, callback );
   },
 
+  // map 调用了回溯方法，可以格式化节点
   map: function( callback ) {
     return this.pushStack( jQuery.map( this, function( elem, i ) {
       return callback.call( elem, i, elem );
     } ) );
   },
 
+  // slice 调用了回溯方法
   slice: function() {
     return this.pushStack( slice.apply( this, arguments ) );
   },
 
+  // 语法糖，注意返回的是 jQuery 对象而不是节点对象
   first: function() {
     return this.eq( 0 );
   },
@@ -152,10 +192,12 @@ jQuery.fn = jQuery.prototype = {
     return this.pushStack( j >= 0 && j < len ? [ this[ j ] ] : [] );
   },
 
+  // 进行回溯，回到上一个对象中
   end: function() {
     return this.prevObject || this.constructor();
   },
 
+  // 继承数组的方法
   push: push,
 
   sort: arr.sort,
@@ -164,7 +206,10 @@ jQuery.fn = jQuery.prototype = {
 
 }
 
-// inject other module into jQuery
+/**
+ * [ jQuery 与其原型扩展核心方法 ]
+ * @return {[type]} [ 返回扩展后的 jQuery 对象或原型对象 ]
+ */
 jQuery.extend = jQuery.fn.extend = function() {
   var
     options, // save each option object
@@ -1942,5 +1987,56 @@ jQuery.fn.extend( {
 
 // -----------------------------------------------------------------------------
 // css 一类方法实现
+
+// 匹配数字，包括科学计数法
+var pnum = ( /[+-]?(?:\d*\.|)\d+(?:[eE][+-]?\d+|)/ ).source;
+
+// 匹配 css 中的值
+// 分别捕获符号，值，单位
+var rcssNum = new RegExp( "^(?:([+-])=|)(" + pnum + ")([a-z%]*)$", "i" );
+
+var cssExpand = [ "Top", "Right", "Bottom", "Left" ];
+
+/**
+ * [ 判断元素是否被隐藏 ]
+ * @return {[type]} [description]
+ */
+var isHiddenWithinTree = function( elem, el ) {
+  elem = elem || el
+  return elem.style.display === "none" ||
+    elem.style.display === "" &&
+    jQuery.contains( elem.ownerDocument, elem ) &&
+    jQuery.css( elem, "display" ) === "none"
+}
+
+/**
+ * [ 在 options 配置下在 elem 上调用 callback，并返回结果 ]
+ * @param  {[type]}   elem     [元素节点]
+ * @param  {[type]}   options  [css 配置信息]
+ * @param  {Function} callback [要调用的函数]
+ * @param  {[type]}   args     [要调用函数的参数]
+ * @return {[type]}            [description]
+ */
+var swap = function( elem, options, callback, args ) {
+  var ret, name,
+    old = {};
+  for ( name in options ) {
+    old[ name ] = elem.style[ name ];
+    elem.style[ name ] = options[ name ];
+  }
+
+  ret = callback.apply( elem, args || [] );
+
+  for ( name in options ) {
+    elem.style[ name ] = old[ name ];
+  }
+
+  return ret;
+};
+
+
+function adjustCSS( elem, prop, valueParts, tween ) {
+
+}
 
 module.exports = jQuery

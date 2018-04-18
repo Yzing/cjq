@@ -87,7 +87,12 @@ function DOMEval( code, doc, node ) {
  * [ 将对象类型转化成字符串形式 ]
  * @param  {[type]} obj [description]
  * @return {[type]}     [description]
- * @desc class2type 中存放了相应对照
+ * @desc
+ * 1、如果 typeof 的返回值是 object 或 function，并不能确定实际类型是什么
+ *  （1）首先去 class2type 中找对照，如果没有，就是 object 对象
+ * 2、如果 typeof 的返回值不是 object 和 function，用该返回值就能确认对象类型
+ * 3、注意，调用的 toString 一定是 Object 原型里的 toString，一些类会自己实现 toString，会有不同的行为
+ *   所以只能用 toString.call() 来调用，而不能用 obj.toString()
  */
 function toType( obj ) {
 	if ( obj == null ) {
@@ -209,18 +214,33 @@ jQuery.fn = jQuery.prototype = {
 /**
  * [ jQuery 与其原型扩展核心方法 ]
  * @return {[type]} [ 返回扩展后的 jQuery 对象或原型对象 ]
+ * @desc
+ * 1、入参，参数顺序为 deep、target、source
+ * 2、先根据传参类型对参数进行修正，修正后 i 始终指向第一个 source，即合并源
+ * 3、参数修正的判断逻辑：
+ *  （1）默认 0 号位为 target，i 指向第一个 source
+ *  （2）如果第一参数为 boolean 类型，说明是 deep 参数，则 1 号位为 target，i 向后移动一位，同样指向第一个 source
+ *  （3）如果 target 不是 object，修正为 {}
+ *  （4）如果 i === length，说明按原有逻辑 source 为空，约定上 source 不可能为空，
+ *      所以将 target 作为 source 处理，target 为 this，i 回退指向原本 target 的位置
+ * 4、对每一个 source 将其合并到 target 中，用 options 来临时储存每一个 source
+ * 5、src 用来存储 target 中的原值，copy 用来存储 options 中的新值
+ * 6、如果是非 deep 模式，就直接将 copy 混入到 target 中
+ * 7、如果是 deep 模式，则要检验 copy，copy 必须为普通对象或数组，这样才有深度合并的可能
+ *  （1）根据 copy 的类型修正相应的 src，实际上使用 clone 来保存的，clone 即是修正后的 src
+ *  （2）将 copy 合并到 clone 里，并将合并后的值混入 target
  */
 jQuery.extend = jQuery.fn.extend = function() {
   var
-    options, // save each option object
-    target = arguments[0] || {}, // first argument is the target
-    i = 1, // indicate the option index
+    options,
+    target = arguments[0] || {},
+    i = 1,
     length = arguments.length,
     copy,
     copyIsArray,
     src,
     clone,
-    deep = false; // option indicating whether the extend is deep mode
+    deep = false;
 
     if( typeof target === 'boolean' ) {
       deep = target;
@@ -278,20 +298,35 @@ jQuery.extend = jQuery.fn.extend = function() {
     return target;
 }
 
+// jQuery 核心模块
 jQuery.extend({
 
   // Unique for each copy of jQuery on the page
 	expando: "jQuery" + ( version + Math.random() ).replace( /\D/g, "" ),
 
 	// Assume jQuery is ready without the ready module
+	// 在没有混入 ready 模块之前都假定是 ready 状态
 	isReady: true,
 
+  // 封装异常行为
 	error: function( msg ) {
 		throw new Error( msg );
 	},
 
+  // 封装默认行为
 	noop: function() {},
 
+  /**
+   * [ 检测是否为平凡对象 ]
+   * @param {[type]} obj [ 需要检测的对象 ]
+   * @return {[type]} [ true or false ]
+   * @desc
+   * 1、逐级判断，能优先判断出 false 能提高函数效率
+   * 2、首先确认 obj 是对象
+   * 3、如果 obj 没有原型，则认为是特例，是由 Object.create(null) 创建，属于 plainObject
+   * 4、从原型中获取 obj 的构造器，判断构造器对应的对象类型，如果是 Object，则是 plainObject
+   * 5、注：ObjectFunctionString 的值为 'function Object() { [native code] }'
+   */
   isPlainObject: function( obj ) {
     var proto, Ctor;
 
@@ -315,6 +350,11 @@ jQuery.extend({
 		return typeof Ctor === "function" && fnToString.call( Ctor ) === ObjectFunctionString;
   },
 
+  /**
+   * [ 判断是否为空对象 ]
+   * @param {[type]} obj [description]
+   * @return {[type]} [description]
+   */
   isEmptyObject: function( obj ) {
     var name;
     for ( name in obj ) {
@@ -323,10 +363,23 @@ jQuery.extend({
     return true;
   },
 
+  /**
+   * [ 全局执行 js 代码 ]
+   * @param {[type]} code [ 执行的代码 ]
+   * @return {[type]} [description]
+   */
   globalEval: function( code ) {
     DOMEval( code );
   },
 
+  /**
+   * [ 对数组的 forEach 进行了扩展，除了遍历数组，还能遍历对象 ]
+   * @param {[type]}   obj      [ 所要遍历的集合 ]
+   * @param {Function} callback [ 对集合中的每个元素进行的操作 ]
+   * @return {[type]}   [description]
+   * @desc
+   * 1、如果 callback 返回 false，就停止遍历
+   */
   each: function( obj, callback ) {
     var length, i = 0;
 
@@ -348,13 +401,23 @@ jQuery.extend({
     return obj;
   },
 
+  // 除去文本的前后空格
   trim: function( text ) {
     return text === null ?
       "" :
       ( text + "" ).replace( rtrim, "");
-      // how to build a effictive regex ?
   },
 
+  /**
+   * [description]
+   * @param {[type]} arr    [ target ]
+   * @param {[type]} result [ 结果载体 ]
+   * @return {[type]} [description]
+   * @desc
+   * 1、arr 可能是 arrayLike 的对象和非 arrayLike 的对象
+   * 2、string 也是 arrayLike 对象，但是要按照非 arrayLike 的对象处理
+   * 3、arrayLike 对象调用 merge 方法处理（String 除外），非 arrayLike 调用 push 方法
+   */
   makeArray: function( arr, result ) {
     var ret = result || [];
     if ( arr != null ) {
@@ -367,10 +430,16 @@ jQuery.extend({
     return ret;
   },
 
+  // 判断一个元素是否在数组中的 i 位置
   inArray: function( ele, array, i ) {
     return ele === null ? -1 : indexOf.call( array, ele, i );
   },
 
+  /**
+   * [ 将两个数组合并，将 second 拼接在 first 后 ]
+   * @desc
+   * 1、与数组的 concat 类似，但是 jQuery 没有继承数组的 concat 方法，用该方法来代替
+   */
   merge: function( first, second ) {
     var len = +second.length,
       j = 0,
@@ -382,6 +451,13 @@ jQuery.extend({
       return first;
   },
 
+  /**
+   * [ 用 callback 对集合进行过滤 ]
+   * @param {[type]}   elems    [ 元素集合 ]
+   * @param {Function} callback [ 过滤方法 ]
+   * @param {[type]}   invert   [ 是否反转 ]
+   * @return {[type]}   [ 过滤后的集合 ]
+   */
   grep: function( elems, callback, invert ) {
     var len,
       i = 0,
@@ -394,9 +470,18 @@ jQuery.extend({
           matches.push( elems[ i ] );
         }
       }
-
       return matches;
   },
+
+  /**
+   * [ 用 callback 对 elems 中每个元素进行重构 ]
+   * @param {[type]}   elems    [ 元素集合 ]
+   * @param {Function} callback [ 重构函数 ]
+   * @param {[type]}   arg      [ callback 执行时参数 ]
+   * @return {[Array]}   [ 返回重构后的元素集合，为数组 ]
+   * @desc
+   * 1、可以对数组和对象进行
+   */
   map: function( elems, callback, arg ) {
     var len = elems.length,
       value,
@@ -424,19 +509,36 @@ jQuery.extend({
 
   guid: 1,
 
+  // 浏览器支持性检验
   support: support
 })
 
-// let jQuery has array's iterator, so that it can be used like for of
+/**
+ * @desc
+ * 1、判断宿主环境中是否有 Symbol 方法
+ * 2、如果有，就通过 Symbol 将数组的迭代器赋给 jQuery 的原型，使 jQuery 可以用 for of 等方式遍历
+ */
 if ( typeof Symbol === "function" ) {
 	jQuery.fn[ Symbol.iterator ] = arr[ Symbol.iterator ];
 }
 
+/**
+ * @desc
+ * 1、填充 class2type 数组，将宿主环境的 toString 打印的类型和 自定义的类型集合做映射
+ */
 jQuery.each( "Boolean Number String Function Array Date RegExp Object Error Symbol".split( " " ),
 function( i, name ) {
 	class2type[ "[object " + name + "]" ] = name.toLowerCase();
 } );
 
+/**
+ * [ 判断对象是否有数组特性 ]
+ * @desc
+ * 1、获取 length 和 type 属性，排除肯定不是 arrayLike 的两种类型，function 和 window
+ * 2、type 为 array，通过
+ * 3、length 为 0，通过
+ * 4、length 不为 0，为其他数字，并且满足合法性校验，通过
+ */
 function isArrayLike( obj ) {
 
 	// Support: real iOS 8.2 only (not reproducible in simulator)
@@ -454,18 +556,32 @@ function isArrayLike( obj ) {
 		typeof length === "number" && length > 0 && ( length - 1 ) in obj;
 }
 
-jQuery.find = Sizzle;
-jQuery.expr = Sizzle.selectors;
+// -----------------------------------------------------------------------------
+// sizzle 实现，暂时略过，
+jQuery.find = Sizzle; // 返回元素集合
+jQuery.expr = Sizzle.selectors; // 选择器？
 
 // Deprecated
 // inject sizzle into jquery
-jQuery.expr[ ":" ] = jQuery.expr.pseudos;
-jQuery.uniqueSort = jQuery.unique = Sizzle.uniqueSort;
-jQuery.text = Sizzle.getText;
-jQuery.isXMLDoc = Sizzle.isXML;
-jQuery.contains = Sizzle.contains;
+jQuery.expr[ ":" ] = jQuery.expr.pseudos; // 伪类
+jQuery.uniqueSort = jQuery.unique = Sizzle.uniqueSort; // 去重排序
+jQuery.text = Sizzle.getText; // 获取文本
+jQuery.isXMLDoc = Sizzle.isXML; // 判断文档类型
+jQuery.contains = Sizzle.contains; // ?
 jQuery.escapeSelector = Sizzle.escape;
+// -----------------------------------------------------------------------------
 
+
+/**
+ * [ 根据 dir 遍历元素，链式遍历，dir 为连接点属性 ]
+ * @param {[type]} elem  [ 根元素 ]
+ * @param {[type]} dir   [ 目录名/属性名 ]
+ * @param {[type]} until [ 停止节点 ]
+ * @return {[type]} [ 返回 elem 到 until 节点间的元素 ]
+ * @desc
+ * 1、遍历上限是 document，而且只取元素节点
+ * 2、一般是向上遍历，如果没传 until，一般会到 document 节点
+ */
 var dir = function( elem, dir, until ) {
   var matched = [],
     truncate = until !== undefined;
@@ -481,6 +597,14 @@ var dir = function( elem, dir, until ) {
   return matched;
 };
 
+/**
+ * [ 平级遍历 ]
+ * @param {[type]} n    [ 起始节点 ]
+ * @param {[type]} elem [ 结束节点 ]
+ * @return {[type]} [ 返回 n 到 elem 间的兄弟节点 ]
+ * @desc
+ * 1、注意，不包含 n 和 elem
+ */
 var siblings = function( n, elem ) {
   var matched = [];
   for ( ; n; n = n.nextSibling ) {

@@ -615,6 +615,7 @@ var siblings = function( n, elem ) {
   return matched;
 };
 
+// 用于检测需要上下文的选择器表达式
 var rneedContext = jQuery.expr.match.needsContext;
 
 function nodeName( elem, name ) {
@@ -623,11 +624,21 @@ function nodeName( elem, name ) {
 
 };
 
-// match single tag, capture the tag's name, including self closed
+// 匹配单个标签
 var singleTag = ( /^<([a-z][^\/\0>:\x20\t\r\n\f]*)[\x20\t\r\n\f]*\/?>(?:<\/\1>|)$/i );
 
-// filt the elements through qualifier
-// qualifier can be function, node, arrayLike Object, and selector
+/**
+ * [ 根据装饰器过滤元素集 ]
+ * @param {[type]} elements  [ 要过滤的元素集合 ]
+ * @param {[ Function, Node, Array, Selector ]} qualifier [ 装饰器 ]
+ * @param {[type]} not       [ 是否反转 ]
+ * @return {[type]} [description]
+ * @desc
+ * 1、如果 qualifier 是 function，则用 grep 进行过滤，过滤规则为 qualifier 的实现逻辑
+ * 2、如果 qualifier 是 node ，过滤规则为 选择与 qualifier 相同的元素
+ * 3、如果 qualifier 是 元素集合，过滤规则为 选择 qualifier 中包含的元素
+ * 4、如果 qualifier 是 选择器，就用 sizzle 去查找
+ */
 function winnow( elements, qualifier, not ) {
   if ( isFunction( qualifier ) ) {
     return jQuery.grep( elements, function( elem, i ) {
@@ -650,32 +661,52 @@ function winnow( elements, qualifier, not ) {
   return jQuery.filter( qualifier, elements, not );
 };
 
-// use selector to filt the elements
+/**
+ * [ 用选择器过滤元素集合 ]
+ * @param {[type]} expr  [ 选择器表达式 ]
+ * @param {[type]} elems [ 元素集合 ]
+ * @param {[type]} not   [ 是否反转 ]
+ * @return {[type]} [description]
+ */
 jQuery.filter = function( expr, elems, not ) {
-  var elem = elems[0];
+  var elem = elems[ 0 ];
 
-  // handle not option
+  // 修正选择器
   if ( not ) {
     expr = ':not(' + expr + ')';
   }
 
-  // if elems only contains one elem, handle it with a easy way
+  // 对于单个元素，直接比较该元素是否满足选择器表达式
   if ( elems.length === 1 && elem.nodeType === 1 ) {
     return jQuery.find.matchesSelector( elem, expr ) ? [ elem ] : [];
   }
 
-  return jQuery.find.matches( jQuery.grep( elems, function( elem ) {
+  // 过滤出元素节点用调用遍历方法查找
+  return jQuery.find.matches( expr, jQuery.grep( elems, function( elem ) {
     return elem.nodeType === 1;
   } ) );
 }
 
+// jQuery 的一些过滤方法
 jQuery.fn.extend( {
+
+  /**
+   * [ 在自身的元素集合中查找 ]
+   * @param {[type]} selector [ 选择器 ]
+   * @return {[type]} [description]
+   * @desc
+   * 1、如果 selector 不是 string，可能是 元素节点、函数、jQuery对象
+   *    就用 jQuery 构造新对象，取两者元素交集作为一个新 jQuery 对象返回
+   *    原对象推入回溯栈
+   * 2、selector 为 string 时，先构造一个空 jQuery 对象 ret，将原对象推入回溯栈
+   *    然后以原对象的每一个元素节点为上下文，调用 sizzle 进行查找，结果放入 ret 中，
+   *    进行排序去重后返回
+   */
   find: function( selector ) {
     var i, ret,
       len = this.length,
       self = this;
 
-    // if selector is an arrayLike Object, select elem from this which contains selector
     if ( typeof selector !== 'string' ) {
       return this.pushStack( jQuery( selector ).filter( function() {
         for ( i = 0; i < len; i++ ) {
@@ -692,15 +723,29 @@ jQuery.fn.extend( {
       jQuery.find( selector, self[i], ret );
     }
 
-    // if this contains more than one element, should ensure every result is unique
     return len > 1 ? jQuery.uniqueSort( ret ) : ret
   },
+
+  // 将原对象推入回溯栈后调用 winnow 进行查找
   filter: function( selector ) {
     return this.pushStack( winnow( this, selector || [] , false ) );
   },
+
+  // 将原对象推入回溯栈后调用 winnow 进行查找
   not: function( selector ) {
     return this.pushStack( winnow( this, selector || [], true ) );
   },
+
+  /**
+   * [ 验证该对象是否满足 selector ]
+   * @param {[type]} selector [description]
+   * @return {[type]} [description]
+   * @desc
+   * 1、如果 selector 是选择器表达式，但是需要上下文支持，就构造 jQuery 对象作为参数，
+   *    jQuery 默认以 document 作为上下文
+   * 2、否则直接传入 selector
+   * 3、？sizzle 不支持上下文不明确的表达式？
+   */
   is: function( selector ) {
     return !!winnow(
       this,
@@ -713,38 +758,68 @@ jQuery.fn.extend( {
   }
 } );
 
+// jQuery 根实例
 var rootjQuery,
 
+  // 快速匹配单标签和 id，不调用 sizzle，提高效率
   quickExpr = /^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]+))$/,
 
+  /**
+   * [ jQuery 构造方法 ]
+   * @param {[type]} selector [ 选择器 ]
+   * @param {[type]} context  [ 上下文 ]
+   * @param {[type]} root     [ 根 ]
+   * @return {[type]} [ jQuery 实例 ]
+   * @desc
+   * 1、在一次构造中，该方法可能被递归的调用多次
+   */
   init = jQuery.fn.init = function( selector, context, root ) {
     var match, elem;
 
+    // 如果无 selector，返回一个空 jQuery 对象
     if ( !selector ) {
       return this;
     }
 
+    // 默认根节点为 document
     root = root || rootjQuery;
 
     if ( typeof selector === 'string' ) {
 
       if ( selector[ 0 ] === '<' &&
+
+        // 检测闭合标签，可能不是单标签
         selector[ selector.length - 1 ] === '>' &&
         selector.length >=3 ) {
         match = [ null, selector, null ];
       } else {
+
+        // 检测 id
         match = quickExpr.exec( selector );
       }
 
       if ( match && ( match[ 1 ] || !context )) {
+
         if ( match[ 1 ] ) {
+
+          // 匹配到标签
+          // 先修正 context，如果是 jQuery 对象，就指定为其第一个元素节点
           context = context instanceof jQuery ? context[ 0 ] : context;
+
+          // 调用 parseHTML 创建 dom 树，并合并到 this
+          // 再次修正了 context，如果 context 为元素节点，修正为包含它 document 或其 本身
+          // 否则为 jQuery 注册的 document
+          // 一般针对有多个 document 的情况
           jQuery.merge( this, jQuery.parseHTML(
             match[ 1 ],
             context && context.nodeType ? context.ownerDocument || context : document,
             true
           ) );
 
+          // dom 树创建完后，处理特例：单标签且 context 为平凡对象
+          // 对插件开发者提供？
+          // 将 context 的 function 混入 this
+          // 将 context 的属性混入 this 的每一个节点
           if ( rsingleTag.test( match[ 1 ] ) && jQuery.isPlainObject( context ) ) {
             for ( match in context ) {
               if ( isFunction( this[ match ] ) ) {
@@ -757,6 +832,8 @@ var rootjQuery,
 
           return this;
         } else {
+
+          // 匹配到 id，且没有指定 context
           elem = document.getElementById( match[ 2 ] );
           if ( elem ) {
             this[ 0 ] = elem;
@@ -765,23 +842,42 @@ var rootjQuery,
           return this;
         }
       } else if ( !context || context.jquery ) {
+
+        // 排除上面情形后，如果没有提供 context，就在跟实例下调用 sizzle 查找
+        // 或者 context 为 jQuery 对象，就直接查找
+        // 此时，context 会在回溯栈中
         return ( context || root ).find( selector );
       } else {
+
+        // 最常用的，构造空对象，然后 find
         return this.constructor().find( selector );
       }
+
+      // 以上完成 selector 为 string 类型的处理
+
     } else if ( selector.nodeType ) {
+
+      // 如果是元素节点，就直接翻到 jQuery 中
       this[ 0 ] = selector;
       this.length = 1;
       return this;
     } else if ( isFunction( selector ) ) {
+
+      // 如果是 function，将 selector 注册到 ready 的回调中，一般对插件提供
       return root.ready !== undefined ?
         root.ready( selector ) :
         selector( jQuery );
     }
 
+    // 处理其他情形
+    // 如果是普通对象，就 push 到 this 中，
+    // 如果是数组对象，就合并到 this 中
     return jQuery.makeArray( selector, this );
   };
 
+
+// 原型修正，init 为实际的构造函数，而非 jQuery()
+// 但是 init.prototype.constructor 调用的不是 init 而是 jQuery
 init.prototype = jQuery.fn;
 
 rootjQuery = jQuery( document );
@@ -789,6 +885,7 @@ rootjQuery = jQuery( document );
 //-------------------- 以上代码基本完成 jQuery 的构造和元素筛查 ^_^ --------------------
 //-------------------- 之后代码基本是对核心进行扩展，借助了很多上面的核心方法 --------------
 
+// 遍历关键词捕获
 var rparentsprev = /^(?:parents|prev(?:Until|All))/,
 
 // Methods guaranteed to produce a unique set when starting from a unique set
@@ -857,7 +954,7 @@ function sibling( cur, dir ) {
   return cur;
 }
 
-// jQuery traversal methods
+// jQuery 遍历方法
 jQuery.each( {
   parent: function( elem ) {
     var parent = elem.parentNode;
@@ -905,6 +1002,7 @@ jQuery.each( {
     return jQuery.merge( [], elem.childNodes );
   }
 }, function( name, fn ) {
+  
   jQuery.fn[ name ] = function( until, selector ) {
     var matched = jQuery.map( this, fn, until );
     if ( name.slice( -5 ) !== 'Until' ) {

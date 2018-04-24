@@ -885,10 +885,10 @@ rootjQuery = jQuery( document );
 //-------------------- 以上代码基本完成 jQuery 的构造和元素筛查 ^_^ --------------------
 //-------------------- 之后代码基本是对核心进行扩展，借助了很多上面的核心方法 --------------
 
-// 遍历关键词捕获
+// 匹配元素后需要倒序排序的方法
 var rparentsprev = /^(?:parents|prev(?:Until|All))/,
 
-// Methods guaranteed to produce a unique set when starting from a unique set
+// 匹配元素后不需要去重的方法
 guaranteedUnique = {
 	children: true,
 	contents: true,
@@ -897,6 +897,14 @@ guaranteedUnique = {
 };
 
 jQuery.fn.extend( {
+  /**
+   * [ 判断 jQuery 实例中是否有满足某一个特征的元素 ]
+   * @param {[type]} target [ 可以是任何 jQuery 对象的构造参数 ]
+   * @return {[type]} [description]
+   * @desc
+   * 1、先用 target 构造 jQuery 对象 targets
+   * 2、再遍历 targets 判断 this 中是否至少包含一个 targets 中的元素
+   */
   has: function( target ) {
     var targets = jQuery( target, this ),
       len = targets.length;
@@ -909,6 +917,17 @@ jQuery.fn.extend( {
       }
     } );
   },
+
+  /**
+   * [ 在 context 上下文中寻找满足 selector 的元素节点 ]
+   * @param {[type]} selector [description]
+   * @param {[type]} context  [description]
+   * @return {[type]} [description]
+   * @desc
+   * 1、如果 selector 为 string，就用其构造 jQuery 对象 targets
+   * 2、selector 为一个需要上下文的选择器，对 this 中每一个元素节点向上去找匹配 targets 的节点
+   * 3、进行去重排序后返回
+   */
   closest: function( selector, context ) {
     var matched = [],
       cur,
@@ -932,9 +951,44 @@ jQuery.fn.extend( {
 
       return this.pushStack( matched.length > 1 ? jQuery.uniqueSort( matched ) : matched );
   },
+
+  /**
+   * [ 寻找元素在 jQuery 实例中的位置 ]
+   * @param {[type]} elem [description]
+   * @return {[type]} [description]
+   * @desc
+   * 1、如果 elem 为假，返回 this[ 0 ] 在父节点中的位置
+   * 2、如果 elem 为 string，就构造 jQuery 实例，返回 this[ 0 ] 在该 jQuery 实例中的位置
+   * 3、如果 elem 是 jQuery 实例，返回 elem[ 0 ] 在 this 中的位置
+   * 4、如果 elem 为 元素节点，返回 elem 在 this 中的位置
+   */
   index: function( elem ) {
 
+		if ( !elem ) {
+			return ( this[ 0 ] && this[ 0 ].parentNode ) ? this.first().prevAll().length : -1;
+		}
+
+		if ( typeof elem === "string" ) {
+			return indexOf.call( jQuery( elem ), this[ 0 ] );
+		}
+
+		return indexOf.call( this,
+
+			elem.jquery ? elem[ 0 ] : elem
+		);
   },
+
+  /**
+   * [ 在 jQuery 实例中添加元素节点 ]
+   * @param {[type]} selector [ 选择器 ]
+   * @param {[type]} context  [ 上下文 ]
+   * @return {[type]} [description]
+   * @desc
+   * 1、首先用 selector，context 构造 jQuery 实例
+   * 2、合并 this 和 jQuery 实例中的元素节点
+   * 3、去重排序后返回元素节点集合
+   * 4、用新的元素集合构造 jQuery 实例返回，并把原实例推入回溯栈
+   */
   add: function( selector, context ) {
     return this.pushStack( jQuery.uniqueSort(
       jQuery.merge(
@@ -942,6 +996,12 @@ jQuery.fn.extend( {
         jQuery( selector, context )
     ) ) );
   },
+
+  /**
+   * [ 将回溯栈中前一个对象合并到当前对象 ]
+   * @param {[type]} selector [description]
+   * @return {[type]} [description]
+   */
   addBack: function( selector ) {
     return this.add( selector == null ?
       this.prevObject : this.prevObject.filter( selector )
@@ -949,6 +1009,12 @@ jQuery.fn.extend( {
   }
 } );
 
+/**
+ * [ 遍历辅助函数 ]
+ * @param {[type]} cur [description]
+ * @param {[type]} dir [description]
+ * @return {[type]} [description]
+ */
 function sibling( cur, dir ) {
   while ( ( cur = cur[ dir ] ) && cur.nodeTyep !== 1 ) {}
   return cur;
@@ -1002,7 +1068,7 @@ jQuery.each( {
     return jQuery.merge( [], elem.childNodes );
   }
 }, function( name, fn ) {
-  
+
   jQuery.fn[ name ] = function( until, selector ) {
     var matched = jQuery.map( this, fn, until );
     if ( name.slice( -5 ) !== 'Until' ) {
@@ -2238,6 +2304,8 @@ var isHiddenWithinTree = function( elem, el ) {
  * @param  {Function} callback [要调用的函数]
  * @param  {[type]}   args     [要调用函数的参数]
  * @return {[type]}            [description]
+ * @desc
+ * 1、把 options 的配置赋给 elem，对 elem 执行 callback 后，在将 elem 的值还原
  */
 var swap = function( elem, options, callback, args ) {
   var ret, name,
@@ -2259,6 +2327,26 @@ var swap = function( elem, options, callback, args ) {
 
 function adjustCSS( elem, prop, valueParts, tween ) {
 
+}
+
+var defaultDisplayMap = {}
+
+/**
+ * [ 获取元素默认的 display 展现方式 ]
+ * @param {[type]} elem [description]
+ * @return {[type]} [description]
+ */
+function getDefaultDisplay( elem ) {
+  var tmp,
+    doc = elem.ownerDocument,
+    nodeName = elem.nodeName,
+    display = defaultDisplayMap[ nodeName ];
+
+  if ( display ) {
+    return display;
+  }
+
+  tmp = doc.body.appendChild( doc.createElement( nodeName ) );
 }
 
 module.exports = jQuery

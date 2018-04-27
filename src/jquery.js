@@ -2335,6 +2335,10 @@ var defaultDisplayMap = {}
  * [ 获取元素默认的 display 展现方式 ]
  * @param {[type]} elem [description]
  * @return {[type]} [description]
+ * @desc
+ * 1、如果 map 中有记录，就从 map 中获取
+ * 2、否则创建元素标签获取其 display 属性存入 map 中
+ * 3、display 为 none 的默认修正为 block
  */
 function getDefaultDisplay( elem ) {
   var tmp,
@@ -2347,6 +2351,161 @@ function getDefaultDisplay( elem ) {
   }
 
   tmp = doc.body.appendChild( doc.createElement( nodeName ) );
+
+  display = jQuery.css( tmp, "display" );
+
+  tmp.parentNode.removeChild( tmp )
+
+  if ( display === "none" ) {
+    display = "block"
+  }
+  defaultDisplayMap[ nodeName ] = display
+
+  return display
+}
+
+/**
+ * [ showHide jQuery.show jQuery.hide 的最终实现 ]
+ * @param {[type]} elements [ 元素节点集合 ]
+ * @param {[type]} show     [ 是否展示 ]
+ * @return {[type]} [description]
+ * @desc
+ * 1、实际操作的是每个 elem 的 style.display 属性
+ * 2、首先要知道 elem 的原始的 display，将其存入 dataPriv 中，在 none 和 display 来回切换
+ * 3、如果 display 为空，就获取 elem 这种元素节点的默认 display 方式作为原始的 display
+ */
+function showHide( elements, show ) {
+  var index,
+    len = elements.length,
+    elem,
+    display;
+  for ( ; index < len; index++ ) {
+    elem = elements[ index ];
+    if ( !elem.style ) {
+      continue;
+    }
+    display = elem.style.display;
+    if ( show ) {
+      if ( display === "none" ) {
+        values[ index ] = dataPriv.get( elem, 'display' ) || null;
+        if ( !value[ index] ) {
+          elem.style.display = "";
+        }
+      }
+      if ( elem.style.display === "" && isHiddenWithinTree( elem ) ) {
+        values[ index ] =getDefaultDisplay( elem );
+      }
+    } else {
+      if ( display !== "none" ) {
+        values[ index ] = "none";
+        dataPriv.set( elem, "display", display );
+      }
+    }
+  }
+
+  for ( index = 0; index < len; index++ ) {
+    if ( value.index != null ) {
+      elements[ index ].style.display = value[ index ];
+    }
+  }
+
+  return elements;
+}
+
+jQuery.fn.extend( {
+  show: function() {
+    return showHide( this, true )
+  },
+  hide: function() {
+    return showHide( this, false )
+  },
+  toggle: function( state ) {
+    if ( typeof state === "boolean" ) {
+      return state ? this.show() : this.hide();
+    }
+    return this.each( function() {
+      if ( isHiddenWithinTree( this) ) {
+        jQuery( this ).show()
+      } else {
+        jQuery( this ).hide()
+      }
+    } );
+  }
+} );
+
+var rcheckableType = ( /^(?:checkbox|radio)$/i );
+
+var rtagName = ( /<([a-z][^\/\0>\x20\t\r\n\f]+)/i );
+
+var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
+
+// We have to close these tags to support XHTML (#13200)
+// 支持 XHTML，需要被包裹的标签的映射
+var wrapMap = {
+  // Support: IE <=9 only
+	option: [ 1, "<select multiple='multiple'>", "</select>" ],
+
+	// XHTML parsers do not magically insert elements in the
+	// same way that tag soup parsers do. So we cannot shorten
+	// this by omitting <tbody> or other required elements.
+	thead: [ 1, "<table>", "</table>" ],
+	col: [ 2, "<table><colgroup>", "</colgroup></table>" ],
+	tr: [ 2, "<table><tbody>", "</tbody></table>" ],
+	td: [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ],
+
+	_default: [ 0, "", "" ]
+}
+
+wrapMap.optgroup = wrapMap.option;
+
+wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
+wrapMap.th = wrapMap.td;
+
+/**
+ * [getAll 获取所有标签的元素节点]
+ * @return {[type]} [description]
+ * @desc
+ * 1、获取上下文中的所有 tag 标签
+ */
+function getAll( context, tag ) {
+
+  var ret;
+
+  if ( typeof context.getElementsByTagName !== "undefined" ) {
+    ret = context.getElementsByTagName( tag || "*" );
+  } else if ( typeof context.querySelectorAll !== "undefined" ) {
+    ret = context.querySelectorAll( tag || "*" );
+  } else {
+    ret = [];
+  }
+
+  if ( tag === undefined || tag && nodeName( context, tag ) ) {
+    return jQuery.merge( [ context ], ret );
+  }
+
+  return ret;
+}
+
+/**
+ * [getGlobalEval]
+ * @param {[type]} elems       [description]
+ * @param {[type]} refElements [description]
+ * @return {[type]} [description]
+ * @desc
+ * 1、给元素节点做映射并存储在 dataPriv 中
+ */
+function getGlobalEval( elems, refElements ) {
+
+}
+
+var rhtml = /<|&#?\w+;/;
+
+/**
+ * [buildFragment 创建文档片段并返回包含的元素节点集合]
+ * @return {[type]} [description]
+ */
+function buildFragment() {
+
 }
 
 module.exports = jQuery

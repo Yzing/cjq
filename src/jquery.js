@@ -2492,7 +2492,7 @@ function getAll( context, tag ) {
  * @param {[type]} refElements [description]
  * @return {[type]} [description]
  * @desc
- * 1、给元素节点做映射并存储在 dataPriv 中
+ * 1、标记 script 标签并存储在 dataPriv 中
  */
 function getGlobalEval( elems, refElements ) {
 
@@ -2501,10 +2501,90 @@ function getGlobalEval( elems, refElements ) {
 var rhtml = /<|&#?\w+;/;
 
 /**
- * [buildFragment 创建文档片段并返回包含的元素节点集合]
+ * [buildFragment 创建文档片段并返回]
  * @return {[type]} [description]
  */
 function buildFragment() {
+
+}
+
+/*
+浏览器功能检测
+检测是否支持 check 表单 clone 时状态保留
+以及 textarea clone 时内部的值是否保留
+ */
+( function() {
+  var fragment = document.createDocumentFragment(),
+		div = fragment.appendChild( document.createElement( "div" ) ),
+		input = document.createElement( "input" );
+
+	// Support: Android 4.0 - 4.3 only
+	// Check state lost if the name is set (#11217)
+	// Support: Windows Web Apps (WWA)
+	// `name` and `type` must use .setAttribute for WWA (#14901)
+	input.setAttribute( "type", "radio" );
+	input.setAttribute( "checked", "checked" );
+	input.setAttribute( "name", "t" );
+
+	div.appendChild( input );
+
+	// Support: Android <=4.1 only
+	// Older WebKit doesn't clone checked state correctly in fragments
+	support.checkClone = div.cloneNode( true ).cloneNode( true ).lastChild.checked;
+
+	// Support: IE <=11 only
+	// Make sure textarea (and checkbox) defaultValue is properly cloned
+	div.innerHTML = "<textarea>x</textarea>";
+	support.noCloneChecked = !!div.cloneNode( true ).lastChild.defaultValue;
+} )()
+
+var documentElement = document.documentElement
+
+/*
+键盘事件、鼠标事件，以及 . 分隔的命名空间
+ */
+var
+	rkeyEvent = /^key/,
+	rmouseEvent = /^(?:mouse|pointer|contextmenu|drag|drop)|click/,
+	rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
+
+function returnTrue() {
+	return true;
+}
+
+function returnFalse() {
+	return false;
+}
+
+/*
+document.activeElement 兼容写法
+ */
+function safeActiveElement() {
+	try {
+		return document.activeElement;
+	} catch ( err ) { }
+}
+
+// -----------------------------------------------------------------------------
+// jQuery.evnet 的实现
+
+/**
+ * [on 注册事件监听]
+ * @return {[type]} [description]
+ */
+function on( elem, types, selector, data, fn, one ) {
+
+}
+
+jQuery.event = {
+  global: {},
+  add: function() {},
+  remove: function() {},
+  dispatch: function() {},
+  handlers: function() {},
+  addProp: function() {},
+  fix: function() {},
+  special: {},
 
 }
 
